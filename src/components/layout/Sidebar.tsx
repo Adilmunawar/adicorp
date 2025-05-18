@@ -12,6 +12,8 @@ import {
   Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { Loader2 } from "lucide-react";
 
 const navItems = [
   { name: "Dashboard", icon: Home, path: "/dashboard" },
@@ -24,6 +26,11 @@ const navItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+  const { signOut, user, loading } = useAuth();
+  
+  const handleSignOut = () => {
+    signOut();
+  };
   
   return (
     <div className="w-64 h-full bg-adicorp-dark-light border-r border-white/10 fixed left-0 top-0 overflow-y-auto animate-slide-in">
@@ -56,15 +63,24 @@ export default function Sidebar() {
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
         <div className="flex items-center gap-3 mb-6 px-2">
           <div className="w-10 h-10 rounded-full bg-adicorp-purple-dark flex items-center justify-center">
-            <UserCog size={18} />
+            {loading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <UserCog size={18} />
+            )}
           </div>
           <div>
-            <h3 className="text-sm font-medium text-white">Admin User</h3>
+            <h3 className="text-sm font-medium text-white">
+              {loading ? "Loading..." : user?.email?.split('@')[0] || "Admin User"}
+            </h3>
             <p className="text-xs text-white/60">Administrator</p>
           </div>
         </div>
         
-        <button className="nav-item w-full justify-center text-white/80 hover:text-white">
+        <button 
+          className="nav-item w-full justify-center text-white/80 hover:text-white"
+          onClick={handleSignOut}
+        >
           <LogOut size={18} />
           <span>Logout</span>
         </button>

@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmployeeRow, EmployeeInsert } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface EmployeeFormProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const { session } = useAuth();
   
   // Initial form state
   const [formData, setFormData] = useState<Omit<EmployeeInsert, 'id' | 'created_at' | 'company_id' | 'user_id'>>({
@@ -70,6 +72,18 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       const fetchEmployee = async () => {
         try {
           setIsFetching(true);
+
+          // Check for session first
+          if (!session) {
+            toast({
+              title: "Authentication required",
+              description: "Please log in to perform this action.",
+              variant: "destructive",
+            });
+            onClose();
+            return;
+          }
+
           const { data, error } = await supabase
             .from('employees')
             .select('*')
@@ -101,7 +115,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       
       fetchEmployee();
     }
-  }, [isOpen, isEditing, employeeId, toast, onClose]);
+  }, [isOpen, isEditing, employeeId, toast, onClose, session]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -119,14 +133,21 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
     try {
       setIsLoading(true);
       
-      // Get user's company_id
-      const { data: profileData, error: profileError } = await supabase.auth.getUser();
-      if (profileError) throw profileError;
+      // Verify we have an active session
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to perform this action.",
+          variant: "destructive",
+        });
+        return;
+      }
       
+      // Get user's company_id
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('company_id')
-        .eq('id', profileData?.user?.id)
+        .eq('id', session.user.id)
         .single();
         
       if (userError) throw userError;

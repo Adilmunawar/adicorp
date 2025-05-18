@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmployeeRow } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency } from "@/types/supabase";
+import { useAuth } from "@/context/AuthContext";
 
 interface EmployeeListProps {
   onAddEmployee: () => void;
@@ -38,11 +39,19 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { session } = useAuth();
 
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
         setLoading(true);
+        
+        // Only fetch if we have an authenticated session
+        if (!session) {
+          setEmployees([]);
+          return;
+        }
+        
         const { data, error } = await supabase
           .from('employees')
           .select('*')
@@ -65,25 +74,39 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
 
     fetchEmployees();
     
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('employee-changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public',
-        table: 'employees' 
-      }, () => {
-        fetchEmployees();
-      })
-      .subscribe();
+    // Set up real-time subscription if we have a session
+    let channel;
+    if (session) {
+      channel = supabase
+        .channel('employee-changes')
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public',
+          table: 'employees' 
+        }, () => {
+          fetchEmployees();
+        })
+        .subscribe();
+    }
       
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [toast]);
+  }, [toast, session]);
   
   const handleDeleteEmployee = async (id: string) => {
     try {
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to perform this action.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const { error } = await supabase
         .from('employees')
         .delete()

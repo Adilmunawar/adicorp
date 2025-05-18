@@ -1,216 +1,188 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-// Mock company data (will be replaced with real data from Supabase)
-const mockCompanies = [
-  { id: "1", name: "TechCorp Inc." },
-  { id: "2", name: "Global Systems" },
-  { id: "3", name: "Nexus Enterprises" },
-];
+import { Loader2 } from "lucide-react";
 
 export default function AuthForm() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(true);
-  const [createCompany, setCreateCompany] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
 
-  // Form states
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    companyName: "",
-    companyId: "",
-    companyLogo: "",
-    companyPhone: "",
-    companyWebsite: "",
-    companyAddress: "",
-  });
+  // Login form state
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  
+  // Registration form state
+  const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsLoading(true);
+      await signIn(loginEmail, loginPassword);
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Login error:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, we'd handle auth with Supabase here
-    console.log("Form data:", formData);
-    
-    // For now, just redirect to dashboard
-    navigate("/dashboard");
+    try {
+      setIsLoading(true);
+      await signUp(registerEmail, registerPassword, { 
+        first_name: firstName, 
+        last_name: lastName 
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="w-full max-w-md">
-      <Card className="glass-card border-white/10">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">
-            {isLogin ? "Sign In" : "Create Account"}
-          </CardTitle>
-          <CardDescription className="text-center">
-            {isLogin 
-              ? "Enter your credentials to access AdiCorp" 
-              : "Set up your account to get started"}
-          </CardDescription>
+    <div className="flex items-center justify-center min-h-screen bg-adicorp-dark p-4">
+      <Card className="w-full max-w-md glass-card bg-adicorp-dark-light border-white/10">
+        <CardHeader className="text-center">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-12 h-12 rounded-lg bg-adicorp-purple flex items-center justify-center">
+              <span className="text-white text-xl font-bold">AC</span>
+            </div>
+          </div>
+          <CardTitle className="text-2xl">AdiCorp Management</CardTitle>
+          <CardDescription>Login or create an account to continue</CardDescription>
         </CardHeader>
-        
         <CardContent>
-          <form onSubmit={handleSubmit}>
-            <Tabs defaultValue={isAdmin ? "admin" : "employee"} className="mb-6">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="admin" onClick={() => setIsAdmin(true)}>
-                  Admin
-                </TabsTrigger>
-                <TabsTrigger value="employee" onClick={() => setIsAdmin(false)}>
-                  Employee
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-adicorp-dark">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="register">Register</TabsTrigger>
+            </TabsList>
             
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  required
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="bg-adicorp-dark-light/50 border-white/10"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="bg-adicorp-dark-light/50 border-white/10"
-                />
-              </div>
-              
-              {!isLogin && isAdmin && (
-                <div className="space-y-4">
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="your@email.com" 
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="bg-adicorp-dark/60 border-white/10"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    placeholder="••••••••" 
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="bg-adicorp-dark/60 border-white/10"
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                      Logging in...
+                    </>
+                  ) : (
+                    "Login"
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+            
+            <TabsContent value="register">
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Company</Label>
-                    <Tabs 
-                      defaultValue={createCompany ? "create" : "existing"}
-                      className="w-full"
-                      onValueChange={(val) => setCreateCompany(val === "create")}
-                    >
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="create">Create New</TabsTrigger>
-                        <TabsTrigger value="existing">Join Existing</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="create" className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="companyName">Company Name</Label>
-                          <Input
-                            id="companyName"
-                            name="companyName"
-                            value={formData.companyName}
-                            onChange={handleInputChange}
-                            className="bg-adicorp-dark-light/50 border-white/10"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="companyPhone">Phone Number</Label>
-                          <Input
-                            id="companyPhone"
-                            name="companyPhone"
-                            value={formData.companyPhone}
-                            onChange={handleInputChange}
-                            className="bg-adicorp-dark-light/50 border-white/10"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="companyWebsite">Website</Label>
-                          <Input
-                            id="companyWebsite"
-                            name="companyWebsite"
-                            value={formData.companyWebsite}
-                            onChange={handleInputChange}
-                            className="bg-adicorp-dark-light/50 border-white/10"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="companyAddress">Address</Label>
-                          <Input
-                            id="companyAddress"
-                            name="companyAddress"
-                            value={formData.companyAddress}
-                            onChange={handleInputChange}
-                            className="bg-adicorp-dark-light/50 border-white/10"
-                          />
-                        </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="existing" className="mt-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="existingCompany">Select Company</Label>
-                          <Select
-                            onValueChange={(value) => 
-                              setFormData(prev => ({ ...prev, companyId: value }))
-                            }
-                          >
-                            <SelectTrigger className="bg-adicorp-dark-light/50 border-white/10">
-                              <SelectValue placeholder="Select a company" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {mockCompanies.map((company) => (
-                                  <SelectItem key={company.id} value={company.id}>
-                                    {company.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </TabsContent>
-                    </Tabs>
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input 
+                      id="firstName" 
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="bg-adicorp-dark/60 border-white/10"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input 
+                      id="lastName" 
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="bg-adicorp-dark/60 border-white/10"
+                      required
+                    />
                   </div>
                 </div>
-              )}
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full mt-6 bg-adicorp-purple hover:bg-adicorp-purple-dark transition-colors btn-glow"
-            >
-              {isLogin ? "Sign In" : "Create Account"}
-            </Button>
-          </form>
+                <div className="space-y-2">
+                  <Label htmlFor="registerEmail">Email</Label>
+                  <Input 
+                    id="registerEmail" 
+                    type="email" 
+                    placeholder="your@email.com" 
+                    value={registerEmail}
+                    onChange={(e) => setRegisterEmail(e.target.value)}
+                    className="bg-adicorp-dark/60 border-white/10"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="registerPassword">Password</Label>
+                  <Input 
+                    id="registerPassword" 
+                    type="password" 
+                    placeholder="••••••••" 
+                    value={registerPassword}
+                    onChange={(e) => setRegisterPassword(e.target.value)}
+                    className="bg-adicorp-dark/60 border-white/10"
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                      Registering...
+                    </>
+                  ) : (
+                    "Create Account"
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
         </CardContent>
-        
-        <CardFooter className="text-center flex justify-center border-t border-white/5 pt-4">
-          <p>
-            {isLogin ? "Don't have an account?" : "Already have an account?"}
-            {" "}
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-adicorp-purple hover:text-adicorp-purple-light transition-colors"
-            >
-              {isLogin ? "Sign Up" : "Sign In"}
-            </button>
+        <CardFooter className="flex justify-center">
+          <p className="text-sm text-white/60">
+            AdiCorp Management © 2025
           </p>
         </CardFooter>
       </Card>
