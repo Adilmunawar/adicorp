@@ -9,7 +9,144 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      attendance: {
+        Row: {
+          created_at: string
+          date: string
+          employee_id: string
+          id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          employee_id: string
+          id?: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          employee_id?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          logo: string | null
+          name: string
+          phone: string | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          logo?: string | null
+          name: string
+          phone?: string | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          logo?: string | null
+          name?: string
+          phone?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      employees: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          rank: string
+          status: string
+          user_id: string | null
+          wage_rate: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          rank: string
+          status?: string
+          user_id?: string | null
+          wage_rate: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          rank?: string
+          status?: string
+          user_id?: string | null
+          wage_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          first_name: string | null
+          id: string
+          is_admin: boolean
+          last_name: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          first_name?: string | null
+          id: string
+          is_admin?: boolean
+          last_name?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          is_admin?: boolean
+          last_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

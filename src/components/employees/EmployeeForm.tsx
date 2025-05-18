@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Dialog,
   DialogContent,
@@ -18,6 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { EmployeeRow, EmployeeInsert } from "@/types/supabase";
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
 
 interface EmployeeFormProps {
   isOpen: boolean;
@@ -38,29 +42,161 @@ const ranks = [
 
 export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFormProps) {
   const isEditing = !!employeeId;
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   
   // Initial form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Omit<EmployeeInsert, 'id' | 'created_at' | 'company_id' | 'user_id'>>({
     name: "",
     rank: "",
-    wageRate: "",
+    wage_rate: 0,
     status: "active"
   });
   
+  useEffect(() => {
+    // Reset form when dialog opens/closes
+    if (!isOpen) {
+      setFormData({
+        name: "",
+        rank: "",
+        wage_rate: 0,
+        status: "active"
+      });
+    }
+    
+    // Fetch employee data if editing
+    if (isOpen && isEditing && employeeId) {
+      const fetchEmployee = async () => {
+        try {
+          setIsFetching(true);
+          const { data, error } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('id', employeeId)
+            .single();
+            
+          if (error) throw error;
+          
+          if (data) {
+            setFormData({
+              name: data.name,
+              rank: data.rank,
+              wage_rate: Number(data.wage_rate),
+              status: data.status
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching employee:", error);
+          toast({
+            title: "Failed to load employee data",
+            description: "Please try again.",
+            variant: "destructive",
+          });
+          onClose();
+        } finally {
+          setIsFetching(false);
+        }
+      };
+      
+      fetchEmployee();
+    }
+  }, [isOpen, isEditing, employeeId, toast, onClose]);
+  
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: name === "wage_rate" ? Number(value) : value 
+    }));
   };
   
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleSubmit = () => {
-    // In a real app, this would create/update an employee in Supabase
-    console.log("Submitting employee data:", formData);
-    onClose();
+  const handleSubmit = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get user's company_id
+      const { data: profileData, error: profileError } = await supabase.auth.getUser();
+      if (profileError) throw profileError;
+      
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', profileData?.user?.id)
+        .single();
+        
+      if (userError) throw userError;
+      
+      if (!userData?.company_id) {
+        throw new Error("Company ID not found. Please set up your company first.");
+      }
+      
+      if (isEditing && employeeId) {
+        // Update existing employee
+        const { error } = await supabase
+          .from('employees')
+          .update({
+            name: formData.name,
+            rank: formData.rank,
+            wage_rate: formData.wage_rate,
+            status: formData.status
+          })
+          .eq('id', employeeId);
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Employee updated",
+          description: "Employee information has been updated successfully.",
+        });
+      } else {
+        // Create new employee
+        const { error } = await supabase
+          .from('employees')
+          .insert({
+            name: formData.name,
+            rank: formData.rank,
+            wage_rate: formData.wage_rate,
+            status: formData.status,
+            company_id: userData.company_id
+          });
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Employee added",
+          description: "New employee has been added successfully.",
+        });
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error("Error saving employee:", error);
+      toast({
+        title: "Failed to save employee",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
+  
+  if (isFetching) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md">
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -106,12 +242,12 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="wageRate">Daily Wage Rate ($)</Label>
+            <Label htmlFor="wageRate">Daily Wage Rate (PKR)</Label>
             <Input
-              id="wageRate"
-              name="wageRate"
+              id="wage_rate"
+              name="wage_rate"
               type="number"
-              value={formData.wageRate}
+              value={formData.wage_rate}
               onChange={handleInputChange}
               className="bg-adicorp-dark/60 border-white/10"
             />
@@ -121,7 +257,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             <Label htmlFor="status">Status</Label>
             <Select 
               onValueChange={(value) => handleSelectChange("status", value)}
-              defaultValue={formData.status}
+              value={formData.status}
             >
               <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
                 <SelectValue placeholder="Select status" />
@@ -138,15 +274,24 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           <Button 
             variant="outline" 
             onClick={onClose}
+            disabled={isLoading}
             className="border-white/10 hover:bg-adicorp-dark"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit}
+            disabled={isLoading}
             className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
           >
-            {isEditing ? "Update Employee" : "Add Employee"}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {isEditing ? "Updating..." : "Adding..."}
+              </>
+            ) : (
+              isEditing ? "Update Employee" : "Add Employee"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
