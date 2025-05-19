@@ -15,7 +15,8 @@ import {
   Trash, 
   UserPlus,
   ChevronDown,
-  Loader2
+  Loader2,
+  RefreshCcw
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,47 +42,86 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user, session } = useAuth();
+  const [companyId, setCompanyId] = useState<string | null>(null);
+
+  const fetchUserCompanyId = async () => {
+    try {
+      if (!session || !user) return null;
+      
+      console.log("Fetching user company ID");
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+        
+      if (error) {
+        console.error("Error fetching user profile:", error);
+        return null;
+      }
+      
+      console.log("User company ID:", data?.company_id);
+      setCompanyId(data?.company_id);
+      return data?.company_id;
+    } catch (error) {
+      console.error("Error fetching company ID:", error);
+      return null;
+    }
+  };
+
+  const fetchEmployees = async (cId?: string | null) => {
+    try {
+      setLoading(true);
+      
+      // Only fetch if we have an authenticated session
+      if (!session || !user) {
+        console.log("No active session, skipping employee fetch");
+        setEmployees([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Get company ID if not provided
+      const currentCompanyId = cId || companyId || await fetchUserCompanyId();
+      
+      if (!currentCompanyId) {
+        console.log("No company ID found, skipping employee fetch");
+        setEmployees([]);
+        setLoading(false);
+        return;
+      }
+      
+      console.log("Fetching employees for company:", currentCompanyId);
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('company_id', currentCompanyId)
+        .order('name');
+        
+      if (error) {
+        console.error("Error fetching employees:", error);
+        throw error;
+      }
+      
+      console.log("Fetched employees:", data?.length || 0);
+      setEmployees(data || []);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      toast({
+        title: "Failed to load employees",
+        description: "Please refresh and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        setLoading(true);
-        
-        // Only fetch if we have an authenticated session
-        if (!session || !user) {
-          console.log("No active session, skipping employee fetch");
-          setEmployees([]);
-          setLoading(false);
-          return;
-        }
-        
-        console.log("Fetching employees with user ID:", user.id);
-        
-        const { data, error } = await supabase
-          .from('employees')
-          .select('*')
-          .order('name');
-          
-        if (error) {
-          console.error("Error fetching employees:", error);
-          throw error;
-        }
-        
-        console.log("Fetched employees:", data?.length || 0);
-        setEmployees(data || []);
-      } catch (error) {
-        console.error("Error fetching employees:", error);
-        toast({
-          title: "Failed to load employees",
-          description: "Please refresh and try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEmployees();
+    fetchUserCompanyId().then(cId => {
+      if (cId) fetchEmployees(cId);
+    });
     
     // Set up real-time subscription if we have a session
     let channel;
@@ -147,7 +187,17 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
   return (
     <Card className="glass-card w-full">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>All Employees</CardTitle>
+        <CardTitle className="flex items-center">
+          <span>All Employees</span>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="ml-2" 
+            onClick={() => fetchEmployees()}
+          >
+            <RefreshCcw className="h-4 w-4" />
+          </Button>
+        </CardTitle>
         <Button 
           onClick={onAddEmployee}
           className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"

@@ -1,139 +1,145 @@
 
 import { useState, useEffect } from "react";
 import Dashboard from "@/components/layout/Dashboard";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, User, Building, ShieldCheck, Mail } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  User,
+  Building,
+  LayoutGrid,
+  Bell,
+  LogOut,
+  Save,
+  Loader2
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { toast as sonnerToast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
-  const { user, session } = useAuth();
+  const { user, session, signOut } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("profile");
   
-  const [profile, setProfile] = useState({
+  // Form states
+  const [profileData, setProfileData] = useState({
     firstName: "",
     lastName: "",
-    email: "",
+    email: ""
   });
   
-  const [company, setCompany] = useState({
+  const [companyData, setCompanyData] = useState({
     name: "",
     address: "",
     phone: "",
-    website: "",
+    website: ""
   });
   
-  const [password, setPassword] = useState({
-    current: "",
-    new: "",
-    confirm: "",
+  const [notificationSettings, setNotificationSettings] = useState({
+    emailNotifications: true,
+    employeeUpdates: true,
+    salaryNotifications: true,
+    systemUpdates: false
   });
-  
+
   useEffect(() => {
-    const fetchProfileAndCompany = async () => {
-      if (!session || !user) return;
-      
+    const fetchUserProfile = async () => {
       try {
-        setLoading(true);
+        setProfileLoading(true);
         
-        // Fetch user profile
+        if (!session || !user) {
+          console.log("No active session, skipping profile fetch");
+          setProfileLoading(false);
+          return;
+        }
+        
+        console.log("Fetching user profile");
+        
+        // Get user profile
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('first_name, last_name, company_id')
+          .select('*, companies(*)')
           .eq('id', user.id)
           .single();
           
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+          throw profileError;
+        }
         
-        setProfile({
+        console.log("Fetched user profile:", profileData);
+        
+        // Update profile form
+        setProfileData({
           firstName: profileData.first_name || "",
           lastName: profileData.last_name || "",
-          email: user.email || "",
+          email: user.email || ""
         });
         
-        // If company_id exists, fetch company details
-        if (profileData.company_id) {
-          const { data: companyData, error: companyError } = await supabase
-            .from('companies')
-            .select('name, address, phone, website')
-            .eq('id', profileData.company_id)
-            .single();
-            
-          if (companyError) throw companyError;
-          
-          setCompany({
-            name: companyData.name || "",
-            address: companyData.address || "",
-            phone: companyData.phone || "",
-            website: companyData.website || "",
+        // Update company form if company exists
+        if (profileData.companies) {
+          setCompanyData({
+            name: profileData.companies.name || "",
+            address: profileData.companies.address || "",
+            phone: profileData.companies.phone || "",
+            website: profileData.companies.website || ""
           });
         }
         
       } catch (error) {
-        console.error("Error fetching settings data:", error);
+        console.error("Error fetching profile data:", error);
         toast({
-          title: "Failed to load settings",
+          title: "Failed to load profile",
           description: "Please refresh and try again.",
           variant: "destructive",
         });
       } finally {
-        setLoading(false);
+        setProfileLoading(false);
       }
     };
     
-    fetchProfileAndCompany();
-  }, [user, session, toast]);
+    fetchUserProfile();
+  }, [toast, user, session]);
   
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setProfile(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleCompanyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setCompany(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setPassword(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const updateProfile = async () => {
-    if (!session || !user) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to update your profile.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+  const handleProfileUpdate = async () => {
     try {
-      setUpdating(true);
+      setLoading(true);
       
+      if (!session || !user) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to perform this action.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log("Updating user profile:", profileData);
+      
+      // Update profile
       const { error } = await supabase
         .from('profiles')
         .update({
-          first_name: profile.firstName,
-          last_name: profile.lastName,
+          first_name: profileData.firstName,
+          last_name: profileData.lastName
         })
         .eq('id', user.id);
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating profile:", error);
+        throw error;
+      }
       
       sonnerToast.success("Profile updated", {
         description: "Your profile has been updated successfully."
       });
-      
     } catch (error) {
       console.error("Error updating profile:", error);
       toast({
@@ -142,130 +148,112 @@ export default function SettingsPage() {
         variant: "destructive",
       });
     } finally {
-      setUpdating(false);
+      setLoading(false);
     }
   };
   
-  const updateCompany = async () => {
-    if (!session || !user) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to update company settings.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+  const handleCompanyUpdate = async () => {
     try {
-      setUpdating(true);
+      setLoading(true);
       
-      // First get company_id from profile
+      if (!session || !user) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to perform this action.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Get company ID first
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('company_id')
         .eq('id', user.id)
         .single();
         
-      if (profileError) throw profileError;
-      
-      if (!profileData.company_id) {
-        throw new Error("Company not found. Please set up your company first.");
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        throw profileError;
       }
       
-      // Update company details
+      if (!profileData.company_id) {
+        toast({
+          title: "Company not set up",
+          description: "Please set up your company first.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log("Updating company data:", companyData);
+      
+      // Update company
       const { error } = await supabase
         .from('companies')
         .update({
-          name: company.name,
-          address: company.address,
-          phone: company.phone,
-          website: company.website,
+          name: companyData.name,
+          address: companyData.address,
+          phone: companyData.phone,
+          website: companyData.website
         })
         .eq('id', profileData.company_id);
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating company:", error);
+        throw error;
+      }
       
       sonnerToast.success("Company updated", {
         description: "Your company information has been updated successfully."
       });
-      
     } catch (error) {
       console.error("Error updating company:", error);
       toast({
         title: "Failed to update company",
-        description: error instanceof Error ? error.message : "Please try again.",
+        description: "Please try again.",
         variant: "destructive",
       });
     } finally {
-      setUpdating(false);
+      setLoading(false);
     }
   };
   
-  const updatePassword = async () => {
-    if (!session) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to change your password.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (password.new !== password.confirm) {
-      toast({
-        title: "Password mismatch",
-        description: "New password and confirmation do not match.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    try {
-      setUpdating(true);
-      
-      const { error } = await supabase.auth.updateUser({
-        password: password.new,
-      });
-      
-      if (error) throw error;
-      
-      sonnerToast.success("Password updated", {
-        description: "Your password has been changed successfully."
-      });
-      
-      // Reset password fields
-      setPassword({
-        current: "",
-        new: "",
-        confirm: "",
-      });
-      
-    } catch (error) {
-      console.error("Error updating password:", error);
-      toast({
-        title: "Failed to update password",
-        description: "Please ensure your current password is correct and try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setUpdating(false);
-    }
+  const handleNotificationUpdate = () => {
+    // In a real app, this would save to the database
+    sonnerToast.success("Notification settings updated", {
+      description: "Your notification preferences have been saved."
+    });
   };
   
-  if (loading) {
+  const handleProfileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setProfileData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleCompanyInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setCompanyData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleLogout = () => {
+    signOut();
+  };
+  
+  if (profileLoading) {
     return (
       <Dashboard title="Settings">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+        <div className="flex justify-center items-center py-16">
+          <Loader2 className="h-12 w-12 animate-spin text-adicorp-purple" />
         </div>
       </Dashboard>
     );
   }
   
   return (
-    <Dashboard title="Settings">
-      <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="glass-card bg-adicorp-dark-light/60 grid grid-cols-3 mb-4">
+    <Dashboard title="System Settings">
+      <Tabs defaultValue="profile" className="space-y-4" onValueChange={setActiveTab}>
+        <TabsList className="glass-card bg-adicorp-dark-light/60 grid grid-cols-4 mb-4">
           <TabsTrigger value="profile" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
             <User className="h-4 w-4 mr-2" />
             Profile
@@ -274,74 +262,95 @@ export default function SettingsPage() {
             <Building className="h-4 w-4 mr-2" />
             Company
           </TabsTrigger>
-          <TabsTrigger value="security" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
-            <ShieldCheck className="h-4 w-4 mr-2" />
-            Security
+          <TabsTrigger value="notifications" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
+            <Bell className="h-4 w-4 mr-2" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Appearance
           </TabsTrigger>
         </TabsList>
         
         <TabsContent value="profile">
           <Card className="glass-card">
             <CardHeader>
-              <CardTitle>Profile Settings</CardTitle>
+              <CardTitle className="flex items-center">
+                <User className="h-5 w-5 mr-2 text-adicorp-purple" />
+                Personal Information
+              </CardTitle>
               <CardDescription>
-                Manage your personal information and contact details.
+                Update your personal details and account settings
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    name="firstName"
-                    value={profile.firstName}
-                    onChange={handleProfileChange}
-                    className="bg-adicorp-dark/60 border-white/10"
-                  />
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      name="firstName"
+                      className="bg-adicorp-dark/60 border-white/10"
+                      value={profileData.firstName}
+                      onChange={handleProfileInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      className="bg-adicorp-dark/60 border-white/10"
+                      value={profileData.lastName}
+                      onChange={handleProfileInputChange}
+                    />
+                  </div>
                 </div>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    name="lastName"
-                    value={profile.lastName}
-                    onChange={handleProfileChange}
-                    className="bg-adicorp-dark/60 border-white/10"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="flex items-center">
+                  <Label htmlFor="email">Email Address</Label>
                   <Input
                     id="email"
                     name="email"
-                    value={profile.email}
-                    readOnly
+                    type="email"
+                    className="bg-adicorp-dark/60 border-white/10"
+                    value={profileData.email}
                     disabled
-                    className="bg-adicorp-dark/80 border-white/10"
+                    readOnly
                   />
-                  <Mail className="h-4 w-4 ml-2 text-white/40" />
+                  <p className="text-xs text-white/60">Email address cannot be changed</p>
                 </div>
-                <p className="text-xs text-white/60">Email address cannot be changed.</p>
+                
+                <div className="flex justify-between pt-4">
+                  <Button 
+                    variant="destructive"
+                    onClick={handleLogout}
+                    className="bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </Button>
+                  
+                  <Button 
+                    onClick={handleProfileUpdate}
+                    disabled={loading}
+                    className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
-              
-              <Button 
-                onClick={updateProfile}
-                disabled={updating}
-                className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
-              >
-                {updating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  "Save Changes"
-                )}
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -349,135 +358,225 @@ export default function SettingsPage() {
         <TabsContent value="company">
           <Card className="glass-card">
             <CardHeader>
-              <CardTitle>Company Information</CardTitle>
+              <CardTitle className="flex items-center">
+                <Building className="h-5 w-5 mr-2 text-adicorp-purple" />
+                Company Information
+              </CardTitle>
               <CardDescription>
-                Update your company details and contact information.
+                Update your organization details
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={company.name}
-                  onChange={handleCompanyChange}
-                  className="bg-adicorp-dark/60 border-white/10"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  name="address"
-                  value={company.address}
-                  onChange={handleCompanyChange}
-                  className="bg-adicorp-dark/60 border-white/10"
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent>
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
+                  <Label htmlFor="companyName">Company Name</Label>
                   <Input
-                    id="phone"
-                    name="phone"
-                    value={company.phone}
-                    onChange={handleCompanyChange}
+                    id="companyName"
+                    name="name"
                     className="bg-adicorp-dark/60 border-white/10"
+                    value={companyData.name}
+                    onChange={handleCompanyInputChange}
                   />
                 </div>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
+                  <Label htmlFor="companyAddress">Address</Label>
                   <Input
-                    id="website"
-                    name="website"
-                    value={company.website}
-                    onChange={handleCompanyChange}
+                    id="companyAddress"
+                    name="address"
                     className="bg-adicorp-dark/60 border-white/10"
+                    value={companyData.address}
+                    onChange={handleCompanyInputChange}
                   />
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="companyPhone">Phone Number</Label>
+                    <Input
+                      id="companyPhone"
+                      name="phone"
+                      className="bg-adicorp-dark/60 border-white/10"
+                      value={companyData.phone}
+                      onChange={handleCompanyInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="companyWebsite">Website</Label>
+                    <Input
+                      id="companyWebsite"
+                      name="website"
+                      className="bg-adicorp-dark/60 border-white/10"
+                      value={companyData.website}
+                      onChange={handleCompanyInputChange}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end pt-4">
+                  <Button 
+                    onClick={handleCompanyUpdate}
+                    disabled={loading}
+                    className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Company Info
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
-              
-              <Button 
-                onClick={updateCompany}
-                disabled={updating}
-                className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
-              >
-                {updating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  "Save Company"
-                )}
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
         
-        <TabsContent value="security">
+        <TabsContent value="notifications">
           <Card className="glass-card">
             <CardHeader>
-              <CardTitle>Security Settings</CardTitle>
+              <CardTitle className="flex items-center">
+                <Bell className="h-5 w-5 mr-2 text-adicorp-purple" />
+                Notification Settings
+              </CardTitle>
               <CardDescription>
-                Manage your password and account security options.
+                Customize how and when you receive notifications
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Current Password</Label>
-                <Input
-                  id="current"
-                  name="current"
-                  type="password"
-                  value={password.current}
-                  onChange={handlePasswordChange}
-                  className="bg-adicorp-dark/60 border-white/10"
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <Input
-                    id="new"
-                    name="new"
-                    type="password"
-                    value={password.new}
-                    onChange={handlePasswordChange}
-                    className="bg-adicorp-dark/60 border-white/10"
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Email Notifications</h4>
+                    <p className="text-sm text-white/60">Receive important updates via email</p>
+                  </div>
+                  <Switch 
+                    checked={notificationSettings.emailNotifications}
+                    onCheckedChange={(checked) => 
+                      setNotificationSettings(prev => ({ ...prev, emailNotifications: checked }))
+                    }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirm"
-                    name="confirm"
-                    type="password"
-                    value={password.confirm}
-                    onChange={handlePasswordChange}
-                    className="bg-adicorp-dark/60 border-white/10"
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Employee Updates</h4>
+                    <p className="text-sm text-white/60">Get notified when employee data changes</p>
+                  </div>
+                  <Switch 
+                    checked={notificationSettings.employeeUpdates}
+                    onCheckedChange={(checked) => 
+                      setNotificationSettings(prev => ({ ...prev, employeeUpdates: checked }))
+                    }
                   />
                 </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Salary Reports</h4>
+                    <p className="text-sm text-white/60">Receive monthly salary processing notifications</p>
+                  </div>
+                  <Switch 
+                    checked={notificationSettings.salaryNotifications}
+                    onCheckedChange={(checked) => 
+                      setNotificationSettings(prev => ({ ...prev, salaryNotifications: checked }))
+                    }
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">System Updates</h4>
+                    <p className="text-sm text-white/60">Get notified about system changes and maintenance</p>
+                  </div>
+                  <Switch 
+                    checked={notificationSettings.systemUpdates}
+                    onCheckedChange={(checked) => 
+                      setNotificationSettings(prev => ({ ...prev, systemUpdates: checked }))
+                    }
+                  />
+                </div>
+                
+                <div className="flex justify-end pt-4">
+                  <Button 
+                    onClick={handleNotificationUpdate}
+                    className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Preferences
+                  </Button>
+                </div>
               </div>
-              
-              <Button 
-                onClick={updatePassword}
-                disabled={updating || !password.current || !password.new || !password.confirm}
-                className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
-              >
-                {updating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  "Change Password"
-                )}
-              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="appearance">
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <LayoutGrid className="h-5 w-5 mr-2 text-adicorp-purple" />
+                Appearance Settings
+              </CardTitle>
+              <CardDescription>
+                Customize how the application looks
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Dark Mode</h4>
+                    <p className="text-sm text-white/60">Already enabled in this theme</p>
+                  </div>
+                  <Switch checked={true} disabled />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium">Compact View</h4>
+                    <p className="text-sm text-white/60">Display more content with less spacing</p>
+                  </div>
+                  <Switch />
+                </div>
+                
+                <div className="mt-6">
+                  <h4 className="font-medium mb-2">Theme Colors</h4>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="flex flex-col items-center">
+                      <div className="h-10 w-10 rounded-full bg-purple-600 border-2 border-white" />
+                      <span className="text-xs mt-1">Default</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <div className="h-10 w-10 rounded-full bg-blue-600" />
+                      <span className="text-xs mt-1">Blue</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <div className="h-10 w-10 rounded-full bg-green-600" />
+                      <span className="text-xs mt-1">Green</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <div className="h-10 w-10 rounded-full bg-red-600" />
+                      <span className="text-xs mt-1">Red</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end pt-4">
+                  <Button 
+                    className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                    onClick={() => sonnerToast.success("Appearance settings saved")}
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Preferences
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

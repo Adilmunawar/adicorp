@@ -48,6 +48,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const { user, session } = useAuth();
+  const [companyId, setCompanyId] = useState<string | null>(null);
   
   // Initial form state
   const [formData, setFormData] = useState<Omit<EmployeeInsert, 'id' | 'created_at' | 'company_id' | 'user_id'>>({
@@ -63,6 +64,34 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
     rank: "",
     wage_rate: ""
   });
+
+  // Fetch company ID when form is opened
+  useEffect(() => {
+    const fetchUserCompanyId = async () => {
+      try {
+        if (!session || !user) return;
+        
+        console.log("Fetching user company ID");
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching user profile:", error);
+          throw error;
+        }
+        
+        console.log("User company ID:", data?.company_id);
+        setCompanyId(data?.company_id);
+      } catch (error) {
+        console.error("Error fetching company ID:", error);
+      }
+    };
+    
+    fetchUserCompanyId();
+  }, [user, session]);
   
   useEffect(() => {
     // Reset form when dialog opens/closes
@@ -208,25 +237,17 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         return;
       }
       
-      console.log("Submitting employee form with session:", session.user.id);
-      
-      // Get user's company_id
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single();
-        
-      if (userError) {
-        console.error("Error fetching profile:", userError);
-        throw userError;
+      // Check if we have a company ID
+      if (!companyId) {
+        toast({
+          title: "Company ID not found",
+          description: "Please set up your company first.",
+          variant: "destructive",
+        });
+        return;
       }
       
-      if (!userData?.company_id) {
-        throw new Error("Company ID not found. Please set up your company first.");
-      }
-
-      console.log("Found company_id:", userData.company_id);
+      console.log("Submitting employee form with company_id:", companyId);
       
       if (isEditing && employeeId) {
         // Update existing employee
@@ -251,7 +272,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         });
       } else {
         // Create new employee
-        console.log("Creating new employee with company_id:", userData.company_id);
+        console.log("Creating new employee with company_id:", companyId);
         const { error } = await supabase
           .from('employees')
           .insert({
@@ -259,8 +280,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             rank: formData.rank,
             wage_rate: formData.wage_rate,
             status: formData.status,
-            company_id: userData.company_id,
-            user_id: null // Explicitly set to null as it's optional
+            company_id: companyId
           });
           
         if (error) {
@@ -274,11 +294,11 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       }
       
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving employee:", error);
       toast({
         title: "Failed to save employee",
-        description: error instanceof Error ? error.message : "Please try again.",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
     } finally {

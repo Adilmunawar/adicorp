@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -11,73 +12,90 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { 
-  CalendarIcon, 
-  Loader2, 
-  Download 
+  CircleDollarSign, 
+  Calendar, 
+  Download,
+  FileSpreadsheet,
+  Briefcase,
+  Loader2
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCurrency } from "@/types/supabase";
 import { EmployeeRow } from "@/types/supabase";
+import { formatCurrency } from "@/types/supabase";
+import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
+import { format } from "date-fns";
 
 export default function SalaryPage() {
-  const { toast } = useToast();
-  const { session } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const { user, session } = useAuth();
+  const [activeTab, setActiveTab] = useState("salary-sheet");
   
-  // Working days in month (excluding weekends)
-  const [workingDays, setWorkingDays] = useState(22);
+  // Current month name and year
+  const currentMonth = format(new Date(), "MMMM yyyy");
+  
+  // Calculate days in current month
+  const daysInMonth = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth() + 1,
+    0
+  ).getDate();
   
   useEffect(() => {
     const fetchEmployees = async () => {
-      if (!session) return;
-      
       try {
         setLoading(true);
         
-        // Get user's company_id
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', session.user.id)
-          .single();
-          
-        if (profileError) throw profileError;
-        
-        if (!profileData.company_id) {
-          toast({
-            title: "Company not found",
-            description: "Please set up your company first.",
-            variant: "destructive",
-          });
+        // Only fetch if we have an authenticated session
+        if (!session || !user) {
+          console.log("No active session, skipping employee fetch");
+          setEmployees([]);
           setLoading(false);
           return;
         }
         
-        // Fetch active employees
-        const { data: employeeData, error: employeeError } = await supabase
+        console.log("Fetching user profile to get company ID");
+        
+        // Get user's company_id
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+          
+        if (userError) {
+          console.error("Error fetching profile:", userError);
+          throw userError;
+        }
+        
+        if (!userData?.company_id) {
+          throw new Error("Company ID not found.");
+        }
+        
+        console.log("Fetching employees for company:", userData.company_id);
+        
+        const { data, error } = await supabase
           .from('employees')
           .select('*')
-          .eq('company_id', profileData.company_id)
+          .eq('company_id', userData.company_id)
           .eq('status', 'active')
           .order('name');
           
-        if (employeeError) throw employeeError;
+        if (error) {
+          console.error("Error fetching employees:", error);
+          throw error;
+        }
         
-        setEmployees(employeeData || []);
-        
-        // Calculate working days for selected month
-        calculateWorkingDays(selectedMonth, selectedYear);
-        
+        console.log("Fetched employees:", data?.length || 0);
+        setEmployees(data || []);
       } catch (error) {
-        console.error("Error fetching salary data:", error);
+        console.error("Error fetching employees:", error);
         toast({
-          title: "Failed to load salary data",
+          title: "Failed to load employee data",
           description: "Please refresh and try again.",
           variant: "destructive",
         });
@@ -85,165 +103,211 @@ export default function SalaryPage() {
         setLoading(false);
       }
     };
-    
+
     fetchEmployees();
-  }, [session, toast, selectedMonth, selectedYear]);
+  }, [toast, session, user]);
   
-  const calculateWorkingDays = (month: number, year: number) => {
-    // Calculate working days (excluding weekends)
-    const daysInMonth = new Date(year, month, 0).getDate();
-    let workDays = 0;
-    
-    for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(year, month - 1, i);
-      const day = date.getDay();
-      
-      // Skip weekends (0 = Sunday, 6 = Saturday)
-      if (day !== 0 && day !== 6) {
-        workDays++;
-      }
-    }
-    
-    setWorkingDays(workDays);
-  };
+  // Calculate total monthly salary
+  const totalSalary = employees.reduce((total, employee) => {
+    return total + (Number(employee.wage_rate) * daysInMonth);
+  }, 0);
   
-  const handleMonthChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedMonth(parseInt(event.target.value));
-  };
-  
-  const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedYear(parseInt(event.target.value));
-  };
-  
-  const calculateSalary = (wageRate: number) => {
-    return wageRate * workingDays;
-  };
-  
-  const calculateTotalSalary = () => {
-    return employees.reduce((total, employee) => {
-      return total + calculateSalary(Number(employee.wage_rate));
-    }, 0);
-  };
-  
-  const handleExportSalarySheet = () => {
-    // Export functionality (future implementation)
-    toast({
-      title: "Export feature coming soon",
-      description: "This feature will be available in a future update.",
-    });
-  };
+  // Calculate average daily wage
+  const averageDailyWage = employees.length > 0 
+    ? employees.reduce((total, employee) => total + Number(employee.wage_rate), 0) / employees.length
+    : 0;
   
   return (
     <Dashboard title="Salary Management">
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <Card className="glass-card">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Salary Sheet</CardTitle>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <select
-                  className="bg-adicorp-dark/60 border border-white/10 rounded px-3 py-2 text-sm"
-                  value={selectedMonth}
-                  onChange={handleMonthChange}
-                >
-                  <option value="1">January</option>
-                  <option value="2">February</option>
-                  <option value="3">March</option>
-                  <option value="4">April</option>
-                  <option value="5">May</option>
-                  <option value="6">June</option>
-                  <option value="7">July</option>
-                  <option value="8">August</option>
-                  <option value="9">September</option>
-                  <option value="10">October</option>
-                  <option value="11">November</option>
-                  <option value="12">December</option>
-                </select>
-                
-                <select
-                  className="bg-adicorp-dark/60 border border-white/10 rounded px-3 py-2 text-sm"
-                  value={selectedYear}
-                  onChange={handleYearChange}
-                >
-                  {[...Array(5)].map((_, i) => {
-                    const year = new Date().getFullYear() - 2 + i;
-                    return (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-white/60">
+              Total Monthly Salary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <CircleDollarSign className="h-5 w-5 mr-2 text-green-400" />
+              <span className="text-2xl font-bold">
+                {formatCurrency(totalSalary)}
+              </span>
+            </div>
+            <p className="text-xs text-white/60 mt-1">
+              For {employees.length} active employees
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-white/60">
+              Pay Period
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Calendar className="h-5 w-5 mr-2 text-blue-400" />
+              <span className="text-2xl font-bold">
+                {currentMonth}
+              </span>
+            </div>
+            <p className="text-xs text-white/60 mt-1">
+              {daysInMonth} working days
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-white/60">
+              Average Daily Wage
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Briefcase className="h-5 w-5 mr-2 text-purple-400" />
+              <span className="text-2xl font-bold">
+                {formatCurrency(averageDailyWage)}
+              </span>
+            </div>
+            <p className="text-xs text-white/60 mt-1">
+              Per employee per day
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <Tabs defaultValue="salary-sheet" className="space-y-4" onValueChange={setActiveTab}>
+        <TabsList className="glass-card bg-adicorp-dark-light/60 grid grid-cols-2 mb-4">
+          <TabsTrigger value="salary-sheet" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Salary Sheet
+          </TabsTrigger>
+          <TabsTrigger value="payslips" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
+            <Download className="h-4 w-4 mr-2" />
+            Payslips
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="salary-sheet">
+          <Card className="glass-card">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Monthly Salary Sheet - {currentMonth}</CardTitle>
               <Button 
-                variant="outline" 
-                className="flex items-center border-white/10"
-                onClick={handleExportSalarySheet}
+                className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
               >
                 <Download className="mr-2 h-4 w-4" />
                 Export
               </Button>
-            </div>
-          </CardHeader>
-          
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
-              </div>
-            ) : employees.length === 0 ? (
-              <div className="text-center py-8 text-white/70">
-                <p>No active employees found. Add employees to manage salaries.</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center text-sm text-white/70">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    <span>Working Days: {workingDays} days</span>
-                  </div>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
                 </div>
-                
+              ) : employees.length === 0 ? (
+                <div className="text-center py-8 text-white/70">
+                  <p>No active employees found. Add employees to generate salary sheets.</p>
+                </div>
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow className="border-white/10 hover:bg-transparent">
-                      <TableHead>Employee Name</TableHead>
+                      <TableHead>Employee</TableHead>
                       <TableHead>Position</TableHead>
                       <TableHead>Daily Rate</TableHead>
+                      <TableHead>Working Days</TableHead>
                       <TableHead>Monthly Salary</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {employees.map((employee) => (
                       <TableRow 
-                        key={employee.id}
+                        key={employee.id} 
                         className="border-white/10 hover:bg-adicorp-dark/30"
                       >
-                        <TableCell>{employee.name}</TableCell>
+                        <TableCell className="font-medium">{employee.name}</TableCell>
                         <TableCell>{employee.rank}</TableCell>
                         <TableCell>{formatCurrency(Number(employee.wage_rate))}</TableCell>
-                        <TableCell className="font-medium">
-                          {formatCurrency(calculateSalary(Number(employee.wage_rate)))}
+                        <TableCell>{daysInMonth}</TableCell>
+                        <TableCell className="font-bold">
+                          {formatCurrency(Number(employee.wage_rate) * daysInMonth)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-blue-500/20 text-blue-400">
+                            Pending
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
-                    
-                    <TableRow className="border-white/10 bg-adicorp-dark/40">
-                      <TableCell colSpan={3} className="text-right font-medium">
-                        Total Monthly Expenses:
-                      </TableCell>
-                      <TableCell className="font-bold text-adicorp-purple">
-                        {formatCurrency(calculateTotalSalary())}
-                      </TableCell>
-                    </TableRow>
                   </TableBody>
                 </Table>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="payslips">
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Individual Payslips - {currentMonth}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+                </div>
+              ) : employees.length === 0 ? (
+                <div className="text-center py-8 text-white/70">
+                  <p>No active employees found. Add employees to generate payslips.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {employees.map((employee) => (
+                    <Card key={employee.id} className="bg-adicorp-dark-light/40 border-white/5">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg">{employee.name}</CardTitle>
+                            <p className="text-sm text-white/60">{employee.rank}</p>
+                          </div>
+                          <Button size="sm" variant="outline" className="border-white/10 hover:bg-adicorp-dark">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-white/60">Daily Rate:</span>
+                            <span>{formatCurrency(Number(employee.wage_rate))}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/60">Working Days:</span>
+                            <span>{daysInMonth}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/60">Deductions:</span>
+                            <span>{formatCurrency(0)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold pt-2 border-t border-white/10">
+                            <span>Net Salary:</span>
+                            <span className="text-green-400">
+                              {formatCurrency(Number(employee.wage_rate) * daysInMonth)}
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </Dashboard>
   );
 }

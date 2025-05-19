@@ -45,7 +45,6 @@ const App = () => (
               <Route path="/salary" element={<Salary />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
-              {/* Add other protected routes here */}
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
