@@ -56,6 +56,13 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
     wage_rate: 0,
     status: "active"
   });
+
+  // Form validation
+  const [formErrors, setFormErrors] = useState({
+    name: "",
+    rank: "",
+    wage_rate: ""
+  });
   
   useEffect(() => {
     // Reset form when dialog opens/closes
@@ -65,6 +72,11 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         rank: "",
         wage_rate: 0,
         status: "active"
+      });
+      setFormErrors({
+        name: "",
+        rank: "",
+        wage_rate: ""
       });
       return;
     }
@@ -128,13 +140,61 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       ...prev, 
       [name]: name === "wage_rate" ? Number(value) : value 
     }));
+    
+    // Clear error when field is updated
+    if (formErrors[name as keyof typeof formErrors]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ""
+      }));
+    }
   };
   
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear error when field is updated
+    if (formErrors[name as keyof typeof formErrors]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ""
+      }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {
+      name: "",
+      rank: "",
+      wage_rate: ""
+    };
+    let isValid = true;
+
+    if (!formData.name.trim()) {
+      errors.name = "Name is required";
+      isValid = false;
+    }
+
+    if (!formData.rank) {
+      errors.rank = "Position is required";
+      isValid = false;
+    }
+
+    if (!formData.wage_rate || formData.wage_rate <= 0) {
+      errors.wage_rate = "Valid wage rate is required";
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
   };
   
   const handleSubmit = async () => {
+    // Validate form before submission
+    if (!validateForm()) {
+      return;
+    }
+
     try {
       setIsLoading(true);
       
@@ -192,14 +252,15 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       } else {
         // Create new employee
         console.log("Creating new employee with company_id:", userData.company_id);
-        const { error, data } = await supabase
+        const { error } = await supabase
           .from('employees')
           .insert({
             name: formData.name,
             rank: formData.rank,
             wage_rate: formData.wage_rate,
             status: formData.status,
-            company_id: userData.company_id
+            company_id: userData.company_id,
+            user_id: null // Explicitly set to null as it's optional
           });
           
         if (error) {
@@ -210,8 +271,6 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         sonnerToast.success("Employee added", {
           description: "New employee has been added successfully."
         });
-        
-        console.log("New employee created:", data);
       }
       
       onClose();
@@ -263,6 +322,9 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
               onChange={handleInputChange}
               className="bg-adicorp-dark/60 border-white/10"
             />
+            {formErrors.name && (
+              <p className="text-red-400 text-xs mt-1">{formErrors.name}</p>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -280,6 +342,9 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
                 ))}
               </SelectContent>
             </Select>
+            {formErrors.rank && (
+              <p className="text-red-400 text-xs mt-1">{formErrors.rank}</p>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -292,6 +357,9 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
               onChange={handleInputChange}
               className="bg-adicorp-dark/60 border-white/10"
             />
+            {formErrors.wage_rate && (
+              <p className="text-red-400 text-xs mt-1">{formErrors.wage_rate}</p>
+            )}
           </div>
           
           <div className="space-y-2">
