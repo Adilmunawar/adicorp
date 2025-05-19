@@ -29,6 +29,7 @@ import { EmployeeRow } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { toast as sonnerToast } from "sonner";
 
 interface EmployeeListProps {
   onAddEmployee: () => void;
@@ -39,7 +40,7 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { session } = useAuth();
+  const { user, session } = useAuth();
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -47,18 +48,26 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
         setLoading(true);
         
         // Only fetch if we have an authenticated session
-        if (!session) {
+        if (!session || !user) {
+          console.log("No active session, skipping employee fetch");
           setEmployees([]);
+          setLoading(false);
           return;
         }
+        
+        console.log("Fetching employees with user ID:", user.id);
         
         const { data, error } = await supabase
           .from('employees')
           .select('*')
           .order('name');
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching employees:", error);
+          throw error;
+        }
         
+        console.log("Fetched employees:", data?.length || 0);
         setEmployees(data || []);
       } catch (error) {
         console.error("Error fetching employees:", error);
@@ -84,9 +93,12 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
           schema: 'public',
           table: 'employees' 
         }, () => {
+          console.log("Employee data changed, refreshing...");
           fetchEmployees();
         })
         .subscribe();
+        
+      console.log("Realtime subscription set up for employees table");
     }
       
     return () => {
@@ -94,11 +106,11 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
         supabase.removeChannel(channel);
       }
     };
-  }, [toast, session]);
+  }, [toast, session, user]);
   
   const handleDeleteEmployee = async (id: string) => {
     try {
-      if (!session) {
+      if (!session || !user) {
         toast({
           title: "Authentication required",
           description: "Please log in to perform this action.",
@@ -107,16 +119,20 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
         return;
       }
       
+      console.log("Deleting employee:", id);
+      
       const { error } = await supabase
         .from('employees')
         .delete()
         .eq('id', id);
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error deleting employee:", error);
+        throw error;
+      }
       
-      toast({
-        title: "Employee deleted",
-        description: "Employee has been successfully removed.",
+      sonnerToast.success("Employee deleted", {
+        description: "Employee has been successfully removed."
       });
     } catch (error) {
       console.error("Error deleting employee:", error);

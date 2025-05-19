@@ -1,10 +1,21 @@
 
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 export const PrivateRoute = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      toast.error("Authentication required", {
+        description: "Please log in to access this page"
+      });
+    }
+  }, [loading, user]);
 
   if (loading) {
     return (
@@ -14,5 +25,5 @@ export const PrivateRoute = () => {
     );
   }
 
-  return user ? <Outlet /> : <Navigate to="/auth" />;
+  return user ? <Outlet /> : <Navigate to="/auth" state={{ from: location }} />;
 };

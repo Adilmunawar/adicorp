@@ -23,6 +23,7 @@ import { EmployeeRow, EmployeeInsert } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { toast as sonnerToast } from "sonner";
 
 interface EmployeeFormProps {
   isOpen: boolean;
@@ -46,7 +47,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
-  const { session } = useAuth();
+  const { user, session } = useAuth();
   
   // Initial form state
   const [formData, setFormData] = useState<Omit<EmployeeInsert, 'id' | 'created_at' | 'company_id' | 'user_id'>>({
@@ -65,6 +66,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         wage_rate: 0,
         status: "active"
       });
+      return;
     }
     
     // Fetch employee data if editing
@@ -74,7 +76,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           setIsFetching(true);
 
           // Check for session first
-          if (!session) {
+          if (!session || !user) {
             toast({
               title: "Authentication required",
               description: "Please log in to perform this action.",
@@ -90,7 +92,10 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             .eq('id', employeeId)
             .single();
             
-          if (error) throw error;
+          if (error) {
+            console.error("Error fetching employee:", error);
+            throw error;
+          }
           
           if (data) {
             setFormData({
@@ -115,7 +120,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       
       fetchEmployee();
     }
-  }, [isOpen, isEditing, employeeId, toast, onClose, session]);
+  }, [isOpen, isEditing, employeeId, toast, onClose, session, user]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -134,7 +139,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       setIsLoading(true);
       
       // Verify we have an active session
-      if (!session) {
+      if (!session || !user) {
         toast({
           title: "Authentication required",
           description: "Please log in to perform this action.",
@@ -143,21 +148,29 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         return;
       }
       
+      console.log("Submitting employee form with session:", session.user.id);
+      
       // Get user's company_id
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('company_id')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .single();
         
-      if (userError) throw userError;
+      if (userError) {
+        console.error("Error fetching profile:", userError);
+        throw userError;
+      }
       
       if (!userData?.company_id) {
         throw new Error("Company ID not found. Please set up your company first.");
       }
+
+      console.log("Found company_id:", userData.company_id);
       
       if (isEditing && employeeId) {
         // Update existing employee
+        console.log("Updating employee:", employeeId);
         const { error } = await supabase
           .from('employees')
           .update({
@@ -168,15 +181,18 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           })
           .eq('id', employeeId);
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error updating employee:", error);
+          throw error;
+        }
         
-        toast({
-          title: "Employee updated",
-          description: "Employee information has been updated successfully.",
+        sonnerToast.success("Employee updated", {
+          description: "Employee information has been updated successfully."
         });
       } else {
         // Create new employee
-        const { error } = await supabase
+        console.log("Creating new employee with company_id:", userData.company_id);
+        const { error, data } = await supabase
           .from('employees')
           .insert({
             name: formData.name,
@@ -186,12 +202,16 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             company_id: userData.company_id
           });
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error creating employee:", error);
+          throw error;
+        }
         
-        toast({
-          title: "Employee added",
-          description: "New employee has been added successfully.",
+        sonnerToast.success("Employee added", {
+          description: "New employee has been added successfully."
         });
+        
+        console.log("New employee created:", data);
       }
       
       onClose();
