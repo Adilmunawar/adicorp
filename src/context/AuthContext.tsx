@@ -35,40 +35,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log("AuthContext - Fetching user profile for:", userId);
       
-      // Using the get_user_profile function to avoid recursion issues
-      const { data, error } = await supabase
-        .rpc('get_user_profile', { user_id: userId })
+      // First get the basic profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
         .single();
       
-      if (error) {
-        console.error("AuthContext - Error fetching user profile:", error);
+      if (profileError) {
+        if (profileError.code === 'PGRST116') {
+          // No profile found, this could be a new user
+          console.log("AuthContext - No profile found, creating one");
+          
+          // Create a new profile
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({ id: userId })
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error("AuthContext - Error creating new profile:", createError);
+            return null;
+          }
+          
+          console.log("AuthContext - New profile created:", newProfile);
+          setUserProfile(newProfile);
+          return newProfile;
+        }
+        
+        console.error("AuthContext - Error fetching user profile:", profileError);
         return null;
       }
       
-      console.log("AuthContext - User profile fetched successfully:", data);
+      console.log("AuthContext - User profile fetched successfully:", profileData);
       
       // Create our extended profile data object
-      const profileData: UserProfileData = { ...data };
+      const profileDataWithCompany: UserProfileData = { ...profileData };
       
       // If we have a company_id, fetch the company details separately
-      if (data && data.company_id) {
+      if (profileData && profileData.company_id) {
+        console.log("AuthContext - Fetching company data for company_id:", profileData.company_id);
+        
         const { data: companyData, error: companyError } = await supabase
           .from('companies')
           .select('*')
-          .eq('id', data.company_id)
+          .eq('id', profileData.company_id)
           .single();
         
         if (!companyError && companyData) {
           // Add company data to our profile object
-          profileData.companies = companyData;
+          profileDataWithCompany.companies = companyData;
           console.log("AuthContext - Company data fetched:", companyData);
         } else if (companyError) {
           console.error("AuthContext - Error fetching company data:", companyError);
         }
+      } else {
+        console.log("AuthContext - User has no company_id, skipping company fetch");
       }
       
-      setUserProfile(profileData);
-      return profileData;
+      setUserProfile(profileDataWithCompany);
+      return profileDataWithCompany;
     } catch (error) {
       console.error("AuthContext - Exception fetching user profile:", error);
       return null;

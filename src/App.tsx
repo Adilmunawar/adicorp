@@ -34,7 +34,6 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <CompanySetupModal />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
@@ -52,6 +51,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <CompanySetupModal />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

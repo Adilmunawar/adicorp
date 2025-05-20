@@ -6,17 +6,16 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Building, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { toast as sonnerToast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function CompanySetupModal() {
   const { toast } = useToast();
@@ -122,16 +121,16 @@ export default function CompanySetupModal() {
       
       // Navigate to dashboard only if we're not already there
       if (location.pathname !== "/dashboard") {
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       } else {
         // If already on dashboard, force a reload to update dashboard data
         window.location.reload();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("CompanySetupModal - Error setting up company:", error);
       toast({
         title: "Failed to setup company",
-        description: error instanceof Error ? error.message : "Please try again.",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -211,22 +210,20 @@ export default function CompanySetupModal() {
           </div>
         </div>
         
-        <DialogFooter>
-          <Button 
-            onClick={handleSubmit}
-            disabled={isLoading || !formData.name.trim()}
-            className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow w-full"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Setting Up...
-              </>
-            ) : (
-              "Complete Setup"
-            )}
-          </Button>
-        </DialogFooter>
+        <Button 
+          onClick={handleSubmit}
+          disabled={isLoading || !formData.name.trim()}
+          className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow w-full"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Setting Up...
+            </>
+          ) : (
+            "Complete Setup"
+          )}
+        </Button>
       </DialogContent>
     </Dialog>
   );
