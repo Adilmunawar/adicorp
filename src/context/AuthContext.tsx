@@ -29,10 +29,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log("Fetching user profile for:", userId);
       
+      // Using the get_user_profile function to avoid recursion issues
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*, companies(*)')
-        .eq('id', userId)
+        .rpc('get_user_profile', { user_id: userId })
         .single();
       
       if (error) {
@@ -41,6 +40,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       console.log("User profile fetched successfully:", data);
+      
+      // If we have a company_id, fetch the company details separately
+      if (data && data.company_id) {
+        const { data: companyData, error: companyError } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', data.company_id)
+          .single();
+        
+        if (!companyError && companyData) {
+          data.companies = companyData;
+        }
+      }
+      
       setUserProfile(data);
       return data;
     } catch (error) {

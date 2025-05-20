@@ -16,12 +16,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { toast as sonnerToast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 export default function CompanySetupModal() {
   const { toast } = useToast();
   const { user, userProfile, refreshProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
   
   const [formData, setFormData] = useState({
     name: "",
@@ -82,6 +84,8 @@ export default function CompanySetupModal() {
         
       if (companyError) throw companyError;
       
+      console.log("Company created:", companyData);
+      
       // Update user profile with company_id
       const { error: profileError } = await supabase
         .from('profiles')
@@ -93,6 +97,8 @@ export default function CompanySetupModal() {
         
       if (profileError) throw profileError;
       
+      console.log("Profile updated with company_id");
+      
       // Refresh profile data
       await refreshProfile();
       
@@ -101,6 +107,7 @@ export default function CompanySetupModal() {
       });
       
       setIsOpen(false);
+      navigate("/dashboard");
     } catch (error) {
       console.error("Error setting up company:", error);
       toast({
