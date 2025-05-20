@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { toast as sonnerToast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function CompanySetupModal() {
   const { toast } = useToast();
@@ -24,6 +24,7 @@ export default function CompanySetupModal() {
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [formData, setFormData] = useState({
     name: "",
@@ -34,12 +35,16 @@ export default function CompanySetupModal() {
 
   // Check if user needs company setup
   useEffect(() => {
+    console.log("CompanySetupModal - Checking if setup needed:", { user, userProfile });
     if (user && userProfile === null) {
       setIsOpen(true);
+      console.log("CompanySetupModal - Opening modal (no profile)");
     } else if (user && userProfile && !userProfile.company_id) {
       setIsOpen(true);
+      console.log("CompanySetupModal - Opening modal (no company)");
     } else {
       setIsOpen(false);
+      console.log("CompanySetupModal - No setup needed");
     }
   }, [user, userProfile]);
   
@@ -69,6 +74,7 @@ export default function CompanySetupModal() {
       }
       
       setIsLoading(true);
+      console.log("CompanySetupModal - Creating company:", formData);
       
       // Create new company
       const { data: companyData, error: companyError } = await supabase
@@ -82,9 +88,12 @@ export default function CompanySetupModal() {
         .select()
         .single();
         
-      if (companyError) throw companyError;
+      if (companyError) {
+        console.error("CompanySetupModal - Company creation error:", companyError);
+        throw companyError;
+      }
       
-      console.log("Company created:", companyData);
+      console.log("CompanySetupModal - Company created:", companyData);
       
       // Update user profile with company_id
       const { error: profileError } = await supabase
@@ -95,9 +104,12 @@ export default function CompanySetupModal() {
         })
         .eq('id', user.id);
         
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error("CompanySetupModal - Profile update error:", profileError);
+        throw profileError;
+      }
       
-      console.log("Profile updated with company_id");
+      console.log("CompanySetupModal - Profile updated with company_id");
       
       // Refresh profile data
       await refreshProfile();
@@ -107,9 +119,16 @@ export default function CompanySetupModal() {
       });
       
       setIsOpen(false);
-      navigate("/dashboard");
+      
+      // Navigate to dashboard only if we're not already there
+      if (location.pathname !== "/dashboard") {
+        navigate("/dashboard");
+      } else {
+        // If already on dashboard, force a reload to update dashboard data
+        window.location.reload();
+      }
     } catch (error) {
-      console.error("Error setting up company:", error);
+      console.error("CompanySetupModal - Error setting up company:", error);
       toast({
         title: "Failed to setup company",
         description: error instanceof Error ? error.message : "Please try again.",
@@ -119,6 +138,9 @@ export default function CompanySetupModal() {
       setIsLoading(false);
     }
   };
+  
+  // Don't render the component if we don't have user data yet
+  if (!user) return null;
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
