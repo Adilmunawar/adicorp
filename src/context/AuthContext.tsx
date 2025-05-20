@@ -9,6 +9,8 @@ type AuthContextType = {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  userProfile: any | null;
+  refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, metadata: any) => Promise<void>;
   signOut: () => Promise<void>;
@@ -19,8 +21,39 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      console.log("Fetching user profile for:", userId);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, companies(*)')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error("Error fetching user profile:", error);
+        return null;
+      }
+      
+      console.log("User profile fetched successfully:", data);
+      setUserProfile(data);
+      return data;
+    } catch (error) {
+      console.error("Exception fetching user profile:", error);
+      return null;
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchUserProfile(user.id);
+    }
+  };
 
   useEffect(() => {
     // First set up the auth state listener
@@ -30,11 +63,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // Show toast on certain auth events
-        if (event === 'SIGNED_OUT') {
+        // Handle user profile fetching with setTimeout to avoid recursion
+        if (event === 'SIGNED_IN' && currentSession?.user) {
+          setTimeout(() => {
+            fetchUserProfile(currentSession.user.id);
+          }, 0);
+        } else if (event === 'SIGNED_OUT') {
+          setUserProfile(null);
           sonnerToast.success('Logged out successfully');
-        } else if (event === 'SIGNED_IN') {
-          sonnerToast.success('Logged in successfully');
         }
       }
     );
@@ -44,6 +80,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("Initial session check:", currentSession ? "Session found" : "No session");
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      
+      if (currentSession?.user) {
+        fetchUserProfile(currentSession.user.id);
+      }
+      
       setLoading(false);
     }).catch(error => {
       console.error("Error getting session:", error);
@@ -117,6 +158,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         session,
         user,
         loading,
+        userProfile,
+        refreshProfile,
         signIn,
         signUp,
         signOut,

@@ -21,7 +21,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeRow, EmployeeInsert } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast as sonnerToast } from "sonner";
 
@@ -31,7 +31,7 @@ interface EmployeeFormProps {
   employeeId?: string; // If provided, we're editing an existing employee
 }
 
-// Mock ranks
+// Available ranks
 const ranks = [
   "Data Entry Operator",
   "Customer Service",
@@ -40,6 +40,9 @@ const ranks = [
   "Accountant",
   "HR Specialist",
   "Marketing Specialist",
+  "Developer",
+  "Designer",
+  "Executive"
 ];
 
 export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFormProps) {
@@ -47,8 +50,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
-  const { user, session } = useAuth();
-  const [companyId, setCompanyId] = useState<string | null>(null);
+  const { user, session, userProfile } = useAuth();
   
   // Initial form state
   const [formData, setFormData] = useState<Omit<EmployeeInsert, 'id' | 'created_at' | 'company_id' | 'user_id'>>({
@@ -65,33 +67,8 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
     wage_rate: ""
   });
 
-  // Fetch company ID when form is opened
-  useEffect(() => {
-    const fetchUserCompanyId = async () => {
-      try {
-        if (!session || !user) return;
-        
-        console.log("Fetching user company ID");
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single();
-          
-        if (error) {
-          console.error("Error fetching user profile:", error);
-          throw error;
-        }
-        
-        console.log("User company ID:", data?.company_id);
-        setCompanyId(data?.company_id);
-      } catch (error) {
-        console.error("Error fetching company ID:", error);
-      }
-    };
-    
-    fetchUserCompanyId();
-  }, [user, session]);
+  // Check if company is set up
+  const hasCompany = !!userProfile?.company_id;
   
   useEffect(() => {
     // Reset form when dialog opens/closes
@@ -238,16 +215,16 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       }
       
       // Check if we have a company ID
-      if (!companyId) {
+      if (!userProfile?.company_id) {
         toast({
           title: "Company ID not found",
-          description: "Please set up your company first.",
+          description: "Please set up your company first in Settings.",
           variant: "destructive",
         });
         return;
       }
       
-      console.log("Submitting employee form with company_id:", companyId);
+      console.log("Submitting employee form with company_id:", userProfile.company_id);
       
       if (isEditing && employeeId) {
         // Update existing employee
@@ -272,7 +249,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         });
       } else {
         // Create new employee
-        console.log("Creating new employee with company_id:", companyId);
+        console.log("Creating new employee with company_id:", userProfile.company_id);
         const { error } = await supabase
           .from('employees')
           .insert({
@@ -280,7 +257,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             rank: formData.rank,
             wage_rate: formData.wage_rate,
             status: formData.status,
-            company_id: companyId
+            company_id: userProfile.company_id
           });
           
         if (error) {
@@ -305,6 +282,34 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       setIsLoading(false);
     }
   };
+
+  const renderCompanySetupNeeded = () => (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md">
+        <div className="text-center py-6">
+          <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Company Setup Required</h2>
+          <p className="text-white/70 mb-4">
+            You need to set up your company information before you can add employees.
+          </p>
+          <Button 
+            variant="default"
+            className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+            onClick={() => {
+              onClose();
+              window.location.href = '/settings';
+            }}
+          >
+            Go to Settings
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+  
+  if (!hasCompany) {
+    return renderCompanySetupNeeded();
+  }
   
   if (isFetching) {
     return (

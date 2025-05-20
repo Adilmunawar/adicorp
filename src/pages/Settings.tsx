@@ -13,7 +13,8 @@ import {
   Bell,
   LogOut,
   Save,
-  Loader2
+  Loader2,
+  RefreshCcw
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -22,10 +23,10 @@ import { toast as sonnerToast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
-  const { user, session, signOut } = useAuth();
+  const { user, session, signOut, userProfile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [profileLoading, setProfileLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   
   // Form states
@@ -50,63 +51,36 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        setProfileLoading(true);
-        
-        if (!session || !user) {
-          console.log("No active session, skipping profile fetch");
-          setProfileLoading(false);
-          return;
-        }
-        
-        console.log("Fetching user profile");
-        
-        // Get user profile
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*, companies(*)')
-          .eq('id', user.id)
-          .single();
-          
-        if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          throw profileError;
-        }
-        
-        console.log("Fetched user profile:", profileData);
-        
-        // Update profile form
-        setProfileData({
-          firstName: profileData.first_name || "",
-          lastName: profileData.last_name || "",
-          email: user.email || ""
+    // Update profile form when userProfile changes
+    if (userProfile) {
+      setProfileData({
+        firstName: userProfile.first_name || "",
+        lastName: userProfile.last_name || "",
+        email: user?.email || ""
+      });
+      
+      if (userProfile.companies) {
+        setCompanyData({
+          name: userProfile.companies.name || "",
+          address: userProfile.companies.address || "",
+          phone: userProfile.companies.phone || "",
+          website: userProfile.companies.website || ""
         });
-        
-        // Update company form if company exists
-        if (profileData.companies) {
-          setCompanyData({
-            name: profileData.companies.name || "",
-            address: profileData.companies.address || "",
-            phone: profileData.companies.phone || "",
-            website: profileData.companies.website || ""
-          });
-        }
-        
-      } catch (error) {
-        console.error("Error fetching profile data:", error);
-        toast({
-          title: "Failed to load profile",
-          description: "Please refresh and try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setProfileLoading(false);
       }
-    };
-    
-    fetchUserProfile();
-  }, [toast, user, session]);
+    }
+  }, [userProfile, user]);
+  
+  const handleRefreshProfile = async () => {
+    try {
+      setRefreshing(true);
+      await refreshProfile();
+      sonnerToast.success("Profile data refreshed");
+    } catch (error) {
+      console.error("Error refreshing profile:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   
   const handleProfileUpdate = async () => {
     try {
@@ -137,14 +111,17 @@ export default function SettingsPage() {
         throw error;
       }
       
+      // Refresh profile data
+      await refreshProfile();
+      
       sonnerToast.success("Profile updated", {
         description: "Your profile has been updated successfully."
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating profile:", error);
       toast({
         title: "Failed to update profile",
-        description: "Please try again.",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -156,7 +133,7 @@ export default function SettingsPage() {
     try {
       setLoading(true);
       
-      if (!session || !user) {
+      if (!session || !user || !userProfile) {
         toast({
           title: "Authentication required",
           description: "Please log in to perform this action.",
@@ -165,19 +142,7 @@ export default function SettingsPage() {
         return;
       }
       
-      // Get company ID first
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single();
-        
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-        throw profileError;
-      }
-      
-      if (!profileData.company_id) {
+      if (!userProfile.company_id) {
         toast({
           title: "Company not set up",
           description: "Please set up your company first.",
@@ -197,21 +162,24 @@ export default function SettingsPage() {
           phone: companyData.phone,
           website: companyData.website
         })
-        .eq('id', profileData.company_id);
+        .eq('id', userProfile.company_id);
         
       if (error) {
         console.error("Error updating company:", error);
         throw error;
       }
       
+      // Refresh profile to get updated company data
+      await refreshProfile();
+      
       sonnerToast.success("Company updated", {
         description: "Your company information has been updated successfully."
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating company:", error);
       toast({
         title: "Failed to update company",
-        description: "Please try again.",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -240,11 +208,20 @@ export default function SettingsPage() {
     signOut();
   };
   
-  if (profileLoading) {
+  if (!userProfile && session) {
     return (
       <Dashboard title="Settings">
-        <div className="flex justify-center items-center py-16">
+        <div className="flex flex-col justify-center items-center py-16 gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-adicorp-purple" />
+          <p className="text-white/70">Loading profile data...</p>
+          <Button 
+            variant="outline" 
+            onClick={handleRefreshProfile}
+            className="mt-4"
+          >
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh Profile
+          </Button>
         </div>
       </Dashboard>
     );
@@ -252,6 +229,23 @@ export default function SettingsPage() {
   
   return (
     <Dashboard title="System Settings">
+      <div className="flex justify-end mb-4">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={handleRefreshProfile}
+          disabled={refreshing}
+          className="text-adicorp-purple border-adicorp-purple/30"
+        >
+          {refreshing ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCcw className="h-4 w-4 mr-2" />
+          )}
+          Refresh Data
+        </Button>
+      </div>
+      
       <Tabs defaultValue="profile" className="space-y-4" onValueChange={setActiveTab}>
         <TabsList className="glass-card bg-adicorp-dark-light/60 grid grid-cols-4 mb-4">
           <TabsTrigger value="profile" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">

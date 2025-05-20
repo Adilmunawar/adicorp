@@ -15,6 +15,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./context/AuthContext";
 import { PrivateRoute } from "./components/layout/PrivateRoute";
+import CompanySetupModal from "./components/company/CompanySetupModal";
 
 // Create a client with default options
 const queryClient = new QueryClient({
@@ -32,6 +33,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <CompanySetupModal />
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
