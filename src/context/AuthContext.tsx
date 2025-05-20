@@ -4,12 +4,18 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { toast as sonnerToast } from "sonner";
+import { ProfileRow, CompanyRow } from "@/types/supabase";
+
+// Define a type that extends the ProfileRow with an optional companies property
+type UserProfileData = ProfileRow & {
+  companies?: CompanyRow | null;
+};
 
 type AuthContextType = {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  userProfile: any | null;
+  userProfile: UserProfileData | null;
   refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, metadata: any) => Promise<void>;
@@ -21,7 +27,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<any | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -41,6 +47,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       console.log("User profile fetched successfully:", data);
       
+      // Create our extended profile data object
+      const profileData: UserProfileData = { ...data };
+      
       // If we have a company_id, fetch the company details separately
       if (data && data.company_id) {
         const { data: companyData, error: companyError } = await supabase
@@ -50,12 +59,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .single();
         
         if (!companyError && companyData) {
-          data.companies = companyData;
+          // Add company data to our profile object
+          profileData.companies = companyData;
         }
       }
       
-      setUserProfile(data);
-      return data;
+      setUserProfile(profileData);
+      return profileData;
     } catch (error) {
       console.error("Exception fetching user profile:", error);
       return null;
