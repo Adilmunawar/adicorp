@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -105,10 +104,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshProfile = async () => {
     if (user?.id) {
       console.log("AuthContext - Refreshing profile for user:", user.id);
-      return await fetchUserProfile(user.id);
+      await fetchUserProfile(user.id);
+      return; // Making sure we explicitly return void
     } else {
       console.log("AuthContext - Cannot refresh profile, no user ID available");
-      return null;
+      return; // Making sure we explicitly return void
     }
   };
 
