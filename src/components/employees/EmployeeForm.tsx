@@ -8,8 +8,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { 
   Select,
@@ -19,11 +17,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { EmployeeRow, EmployeeInsert } from "@/types/supabase";
+import { EmployeeRow } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast as sonnerToast } from "sonner";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 
 interface EmployeeFormProps {
   isOpen: boolean;
@@ -45,6 +48,16 @@ const ranks = [
   "Executive"
 ];
 
+// Form validation schema
+const employeeSchema = z.object({
+  name: z.string().min(1, { message: "Name is required" }),
+  rank: z.string().min(1, { message: "Rank is required" }),
+  wage_rate: z.coerce.number().min(0.01, { message: "Wage rate must be greater than 0" }),
+  status: z.enum(["active", "inactive"])
+});
+
+type FormValues = z.infer<typeof employeeSchema>;
+
 export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFormProps) {
   const isEditing = !!employeeId;
   const { toast } = useToast();
@@ -52,19 +65,15 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   const [isFetching, setIsFetching] = useState(false);
   const { user, session, userProfile } = useAuth();
   
-  // Initial form state
-  const [formData, setFormData] = useState<Omit<EmployeeInsert, 'id' | 'created_at' | 'company_id' | 'user_id'>>({
-    name: "",
-    rank: "",
-    wage_rate: 0,
-    status: "active"
-  });
-
-  // Form validation
-  const [formErrors, setFormErrors] = useState({
-    name: "",
-    rank: "",
-    wage_rate: ""
+  // Initialize the form
+  const form = useForm<FormValues>({
+    resolver: zodResolver(employeeSchema),
+    defaultValues: {
+      name: "",
+      rank: "",
+      wage_rate: 0,
+      status: "active"
+    }
   });
 
   // Check if company is set up
@@ -73,16 +82,11 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   useEffect(() => {
     // Reset form when dialog opens/closes
     if (!isOpen) {
-      setFormData({
+      form.reset({
         name: "",
         rank: "",
         wage_rate: 0,
         status: "active"
-      });
-      setFormErrors({
-        name: "",
-        rank: "",
-        wage_rate: ""
       });
       return;
     }
@@ -116,11 +120,11 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           }
           
           if (data) {
-            setFormData({
+            form.reset({
               name: data.name,
               rank: data.rank,
               wage_rate: Number(data.wage_rate),
-              status: data.status
+              status: data.status as "active" | "inactive"
             });
           }
         } catch (error) {
@@ -138,69 +142,9 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       
       fetchEmployee();
     }
-  }, [isOpen, isEditing, employeeId, toast, onClose, session, user]);
+  }, [isOpen, isEditing, employeeId, toast, onClose, session, user, form]);
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: name === "wage_rate" ? Number(value) : value 
-    }));
-    
-    // Clear error when field is updated
-    if (formErrors[name as keyof typeof formErrors]) {
-      setFormErrors(prev => ({
-        ...prev,
-        [name]: ""
-      }));
-    }
-  };
-  
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when field is updated
-    if (formErrors[name as keyof typeof formErrors]) {
-      setFormErrors(prev => ({
-        ...prev,
-        [name]: ""
-      }));
-    }
-  };
-
-  const validateForm = () => {
-    const errors = {
-      name: "",
-      rank: "",
-      wage_rate: ""
-    };
-    let isValid = true;
-
-    if (!formData.name.trim()) {
-      errors.name = "Name is required";
-      isValid = false;
-    }
-
-    if (!formData.rank) {
-      errors.rank = "Position is required";
-      isValid = false;
-    }
-
-    if (!formData.wage_rate || formData.wage_rate <= 0) {
-      errors.wage_rate = "Valid wage rate is required";
-      isValid = false;
-    }
-
-    setFormErrors(errors);
-    return isValid;
-  };
-  
-  const handleSubmit = async () => {
-    // Validate form before submission
-    if (!validateForm()) {
-      return;
-    }
-
+  const handleSubmit = async (values: FormValues) => {
     try {
       setIsLoading(true);
       
@@ -232,10 +176,10 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         const { error } = await supabase
           .from('employees')
           .update({
-            name: formData.name,
-            rank: formData.rank,
-            wage_rate: formData.wage_rate,
-            status: formData.status
+            name: values.name,
+            rank: values.rank,
+            wage_rate: values.wage_rate,
+            status: values.status
           })
           .eq('id', employeeId);
           
@@ -253,10 +197,10 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         const { error } = await supabase
           .from('employees')
           .insert({
-            name: formData.name,
-            rank: formData.rank,
-            wage_rate: formData.wage_rate,
-            status: formData.status,
+            name: values.name,
+            rank: values.rank,
+            wage_rate: values.wage_rate,
+            status: values.status,
             company_id: userProfile.company_id
           });
           
@@ -337,97 +281,123 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input
-              id="name"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
               name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="bg-adicorp-dark/60 border-white/10"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      className="bg-adicorp-dark/60 border-white/10"
+                      placeholder="e.g. John Smith"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {formErrors.name && (
-              <p className="text-red-400 text-xs mt-1">{formErrors.name}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="rank">Rank/Position</Label>
-            <Select 
-              onValueChange={(value) => handleSelectChange("rank", value)}
-              value={formData.rank}
-            >
-              <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
-                <SelectValue placeholder="Select a position" />
-              </SelectTrigger>
-              <SelectContent className="bg-adicorp-dark-light border-white/10">
-                {ranks.map((rank) => (
-                  <SelectItem key={rank} value={rank}>{rank}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {formErrors.rank && (
-              <p className="text-red-400 text-xs mt-1">{formErrors.rank}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="wageRate">Daily Wage Rate (PKR)</Label>
-            <Input
-              id="wage_rate"
+            
+            <FormField
+              control={form.control}
+              name="rank"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rank/Position</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
+                        <SelectValue placeholder="Select a position" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-adicorp-dark-light border-white/10">
+                      {ranks.map((rank) => (
+                        <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
               name="wage_rate"
-              type="number"
-              value={formData.wage_rate}
-              onChange={handleInputChange}
-              className="bg-adicorp-dark/60 border-white/10"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Daily Wage Rate (PKR)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      {...field}
+                      className="bg-adicorp-dark/60 border-white/10"
+                      placeholder="e.g. 1500"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {formErrors.wage_rate && (
-              <p className="text-red-400 text-xs mt-1">{formErrors.wage_rate}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select 
-              onValueChange={(value) => handleSelectChange("status", value)}
-              value={formData.status}
-            >
-              <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent className="bg-adicorp-dark-light border-white/10">
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        <DialogFooter>
-          <Button 
-            variant="outline" 
-            onClick={onClose}
-            disabled={isLoading}
-            className="border-white/10 hover:bg-adicorp-dark"
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={isLoading}
-            className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {isEditing ? "Updating..." : "Adding..."}
-              </>
-            ) : (
-              isEditing ? "Update Employee" : "Add Employee"
-            )}
-          </Button>
-        </DialogFooter>
+            
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-adicorp-dark-light border-white/10">
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onClose}
+                disabled={isLoading}
+                className="border-white/10 hover:bg-adicorp-dark"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isLoading}
+                className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isEditing ? "Updating..." : "Adding..."}
+                  </>
+                ) : (
+                  isEditing ? "Update Employee" : "Add Employee"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

@@ -16,6 +16,8 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./context/AuthContext";
 import { PrivateRoute } from "./components/layout/PrivateRoute";
 import CompanySetupModal from "./components/company/CompanySetupModal";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 // Create a client with default options
 const queryClient = new QueryClient({
@@ -27,35 +29,63 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            
-            {/* Protected Routes */}
-            <Route element={<PrivateRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/employees" element={<Employees />} />
-              <Route path="/attendance" element={<Attendance />} />
-              <Route path="/salary" element={<Salary />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/settings" element={<Settings />} />
-            </Route>
-            
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <CompanySetupModal />
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+// Function to ensure storage bucket exists for logo uploads
+const ensureStorageBuckets = async () => {
+  try {
+    // Check if logos bucket exists, create if not
+    const { data: bucketData } = await supabase.storage.getBucket('logos');
+    if (!bucketData) {
+      console.log("Creating logos storage bucket");
+      await supabase.storage.createBucket('logos', {
+        public: true,
+        fileSizeLimit: 2097152, // 2MB limit
+      });
+    }
+  } catch (error) {
+    console.log("Creating logos bucket");
+    await supabase.storage.createBucket('logos', {
+      public: true,
+      fileSizeLimit: 2097152, // 2MB limit
+    });
+  }
+};
+
+const App = () => {
+  // Ensure storage buckets exist on app load
+  useEffect(() => {
+    ensureStorageBuckets();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              
+              {/* Protected Routes */}
+              <Route element={<PrivateRoute />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/employees" element={<Employees />} />
+                <Route path="/attendance" element={<Attendance />} />
+                <Route path="/salary" element={<Salary />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+              
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <CompanySetupModal />
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

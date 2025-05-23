@@ -105,9 +105,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshProfile = async () => {
     if (user?.id) {
       console.log("AuthContext - Refreshing profile for user:", user.id);
-      await fetchUserProfile(user.id);
+      return await fetchUserProfile(user.id);
     } else {
       console.log("AuthContext - Cannot refresh profile, no user ID available");
+      return null;
     }
   };
 

@@ -6,9 +6,10 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Building, Loader2 } from "lucide-react";
+import { Building, Loader2, Upload } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { toast as sonnerToast } from "sonner";
@@ -16,20 +17,42 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+// Form validation schema
+const formSchema = z.object({
+  name: z.string().min(1, { message: "Company name is required" }),
+  phone: z.string().optional(),
+  website: z.string().url({ message: "Please enter a valid URL" }).optional().or(z.literal('')),
+  address: z.string().optional(),
+  logo: z.string().optional()
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 export default function CompanySetupModal() {
   const { toast } = useToast();
   const { user, userProfile, refreshProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    website: "",
-    address: ""
+  // Set up form with validation
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      phone: "",
+      website: "",
+      address: "",
+      logo: ""
+    }
   });
 
   // Check if user needs company setup
@@ -46,22 +69,22 @@ export default function CompanySetupModal() {
       console.log("CompanySetupModal - No setup needed");
     }
   }, [user, userProfile]);
-  
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setLogoFile(file);
+      
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onload = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
   
-  const handleSubmit = async () => {
-    if (!formData.name.trim()) {
-      toast({
-        title: "Company name required",
-        description: "Please enter a company name to continue",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleSubmit = async (values: FormValues) => {
     try {
       if (!user) {
         toast({
@@ -73,16 +96,42 @@ export default function CompanySetupModal() {
       }
       
       setIsLoading(true);
-      console.log("CompanySetupModal - Creating company:", formData);
+      console.log("CompanySetupModal - Creating company:", values);
+      
+      let logoUrl = null;
+      
+      // Upload logo if provided
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const filePath = `${user.id}-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError, data } = await supabase.storage
+          .from('logos')
+          .upload(filePath, logoFile);
+          
+        if (uploadError) {
+          console.error("CompanySetupModal - Logo upload error:", uploadError);
+          throw uploadError;
+        }
+        
+        // Get public URL for the logo
+        const { data: { publicUrl } } = supabase.storage
+          .from('logos')
+          .getPublicUrl(filePath);
+          
+        logoUrl = publicUrl;
+        console.log("CompanySetupModal - Logo uploaded:", logoUrl);
+      }
       
       // Create new company
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .insert({
-          name: formData.name,
-          phone: formData.phone || null,
-          website: formData.website || null,
-          address: formData.address || null
+          name: values.name,
+          phone: values.phone || null,
+          website: values.website || null,
+          address: values.address || null,
+          logo: logoUrl
         })
         .select()
         .single();
@@ -159,71 +208,144 @@ export default function CompanySetupModal() {
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Company Name*</Label>
-            <Input
-              id="name"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
               name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="bg-adicorp-dark/60 border-white/10"
-              placeholder="e.g. Acme Corporation"
-              required
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company Name*</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      className="bg-adicorp-dark/60 border-white/10"
+                      placeholder="e.g. Acme Corporation"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
+            
+            <FormField
+              control={form.control}
               name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-              className="bg-adicorp-dark/60 border-white/10"
-              placeholder="e.g. +1 (555) 123-4567"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      className="bg-adicorp-dark/60 border-white/10"
+                      placeholder="e.g. +1 (555) 123-4567"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="website">Website</Label>
-            <Input
-              id="website"
+            
+            <FormField
+              control={form.control}
               name="website"
-              value={formData.website}
-              onChange={handleInputChange}
-              className="bg-adicorp-dark/60 border-white/10"
-              placeholder="e.g. www.example.com"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Website</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      className="bg-adicorp-dark/60 border-white/10"
+                      placeholder="e.g. https://www.example.com"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
+            
+            <FormField
+              control={form.control}
               name="address"
-              value={formData.address}
-              onChange={handleInputChange}
-              className="bg-adicorp-dark/60 border-white/10"
-              placeholder="e.g. 123 Main Street, City, Country"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      className="bg-adicorp-dark/60 border-white/10"
+                      placeholder="e.g. 123 Main Street, City, Country"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-        </div>
-        
-        <Button 
-          onClick={handleSubmit}
-          disabled={isLoading || !formData.name.trim()}
-          className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow w-full"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Setting Up...
-            </>
-          ) : (
-            "Complete Setup"
-          )}
-        </Button>
+            
+            <div className="space-y-2">
+              <Label>Company Logo</Label>
+              <div className="flex items-center space-x-3">
+                {logoPreview ? (
+                  <div className="relative w-12 h-12 rounded bg-white/10 overflow-hidden">
+                    <img 
+                      src={logoPreview} 
+                      alt="Logo Preview" 
+                      className="w-full h-full object-contain"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLogoFile(null);
+                        setLogoPreview(null);
+                      }}
+                      className="absolute top-0 right-0 bg-black/50 text-white p-1 rounded-bl"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 flex items-center justify-center rounded bg-adicorp-dark/60 border border-white/10">
+                    <Building className="h-6 w-6 text-white/50" />
+                  </div>
+                )}
+                <div>
+                  <label 
+                    htmlFor="logo-upload" 
+                    className="cursor-pointer px-4 py-2 rounded text-sm bg-adicorp-dark/80 hover:bg-adicorp-dark/60 border border-white/10 flex items-center"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Logo
+                  </label>
+                  <input 
+                    id="logo-upload" 
+                    type="file" 
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="hidden"
+                  />
+                  <p className="text-xs text-white/50 mt-1">Optional. PNG or JPG recommended</p>
+                </div>
+              </div>
+            </div>
+          
+            <DialogFooter className="pt-4">
+              <Button 
+                type="submit"
+                disabled={isLoading || !form.formState.isValid}
+                className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow w-full"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Setting Up...
+                  </>
+                ) : (
+                  "Complete Setup"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
