@@ -22,7 +22,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
-// Form validation schema
 const formSchema = z.object({
   name: z.string().min(1, { message: "Company name is required" }),
   phone: z.string().optional(),
@@ -43,7 +42,6 @@ export default function CompanySetupModal() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Set up form with validation
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -55,18 +53,19 @@ export default function CompanySetupModal() {
     }
   });
 
-  // Check if user needs company setup
   useEffect(() => {
-    console.log("CompanySetupModal - Checking if setup needed:", { user, userProfile });
-    if (user && userProfile === null) {
+    console.log("CompanySetupModal - Checking setup needed:", { 
+      user: !!user, 
+      userProfile: !!userProfile, 
+      company_id: userProfile?.company_id 
+    });
+    
+    if (user && userProfile !== null && !userProfile.company_id) {
+      console.log("CompanySetupModal - Opening modal for company setup");
       setIsOpen(true);
-      console.log("CompanySetupModal - Opening modal (no profile)");
-    } else if (user && userProfile && !userProfile.company_id) {
-      setIsOpen(true);
-      console.log("CompanySetupModal - Opening modal (no company)");
     } else {
-      setIsOpen(false);
       console.log("CompanySetupModal - No setup needed");
+      setIsOpen(false);
     }
   }, [user, userProfile]);
 
@@ -75,7 +74,6 @@ export default function CompanySetupModal() {
       const file = e.target.files[0];
       setLogoFile(file);
       
-      // Create preview URL
       const reader = new FileReader();
       reader.onload = () => {
         setLogoPreview(reader.result as string);
@@ -100,14 +98,13 @@ export default function CompanySetupModal() {
       
       let logoUrl = null;
       
-      // Upload logo if provided
       if (logoFile) {
         const fileExt = logoFile.name.split('.').pop();
         const filePath = `${user.id}-${Date.now()}.${fileExt}`;
         
         console.log("CompanySetupModal - Uploading logo to:", filePath);
         
-        const { error: uploadError, data } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('logos')
           .upload(filePath, logoFile);
           
@@ -116,7 +113,6 @@ export default function CompanySetupModal() {
           throw uploadError;
         }
         
-        // Get public URL for the logo
         const { data: { publicUrl } } = supabase.storage
           .from('logos')
           .getPublicUrl(filePath);
@@ -125,7 +121,6 @@ export default function CompanySetupModal() {
         console.log("CompanySetupModal - Logo uploaded:", logoUrl);
       }
       
-      // Create new company
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .insert({
@@ -145,7 +140,6 @@ export default function CompanySetupModal() {
       
       console.log("CompanySetupModal - Company created:", companyData);
       
-      // Update user profile with company_id
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
@@ -159,9 +153,8 @@ export default function CompanySetupModal() {
         throw profileError;
       }
       
-      console.log("CompanySetupModal - Profile updated with company_id");
+      console.log("CompanySetupModal - Profile updated successfully");
       
-      // Refresh profile data
       await refreshProfile();
       
       sonnerToast.success("Company setup complete", {
@@ -170,7 +163,6 @@ export default function CompanySetupModal() {
       
       setIsOpen(false);
       
-      // Navigate to dashboard only if we're not already there
       if (location.pathname !== "/dashboard") {
         navigate("/dashboard", { replace: true });
       }
@@ -186,12 +178,10 @@ export default function CompanySetupModal() {
     }
   };
   
-  // Don't render the component if we don't have user data yet
   if (!user) return null;
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      // Only allow closing if we have a company set up
       if (userProfile && userProfile.company_id) {
         setIsOpen(open);
       }

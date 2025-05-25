@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const { toast } = useToast();
-  const { session, userProfile } = useAuth();
+  const { session, userProfile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [needsCompanySetup, setNeedsCompanySetup] = useState(false);
   const [stats, setStats] = useState({
@@ -23,14 +23,21 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const checkSetupAndFetchData = async () => {
       try {
-        if (!session) return;
+        if (authLoading || !session) {
+          return;
+        }
         
         setLoading(true);
         
-        // First check if the user has a company set up
+        console.log("Dashboard - Checking company setup:", { 
+          userProfile, 
+          company_id: userProfile?.company_id 
+        });
+        
         if (!userProfile?.company_id) {
+          console.log("Dashboard - No company setup, showing setup form");
           setNeedsCompanySetup(true);
           setLoading(false);
           return;
@@ -38,18 +45,20 @@ export default function DashboardPage() {
           setNeedsCompanySetup(false);
         }
         
-        // Fetch employee stats
+        console.log("Dashboard - Fetching dashboard stats for company:", userProfile.company_id);
+        
         const { data: employeeData, error: employeeError } = await supabase
           .from('employees')
           .select('id, status, wage_rate')
           .eq('company_id', userProfile.company_id);
           
-        if (employeeError) throw employeeError;
+        if (employeeError) {
+          console.error("Dashboard - Error fetching employees:", employeeError);
+          throw employeeError;
+        }
         
-        // Get today's date in YYYY-MM-DD format
         const today = new Date().toISOString().split('T')[0];
         
-        // Fetch today's attendance
         const { data: attendanceData, error: attendanceError } = await supabase
           .from('attendance')
           .select('id')
@@ -57,14 +66,15 @@ export default function DashboardPage() {
           .in('employee_id', employeeData?.map(emp => emp.id) || [])
           .eq('status', 'present');
           
-        if (attendanceError && attendanceError.code !== 'PGRST116') throw attendanceError;
+        if (attendanceError && attendanceError.code !== 'PGRST116') {
+          console.error("Dashboard - Error fetching attendance:", attendanceError);
+          throw attendanceError;
+        }
         
-        // Calculate statistics
         const totalEmployees = employeeData?.length || 0;
         const activeEmployees = employeeData?.filter(emp => emp.status === 'active').length || 0;
         const dailyAttendance = attendanceData?.length || 0;
         
-        // Calculate monthly expenses (simple estimation based on wage rate * 30 days)
         const monthlyExpenses = employeeData?.reduce((sum, emp) => {
           if (emp.status === 'active') {
             return sum + (Number(emp.wage_rate) * 30);
@@ -79,8 +89,15 @@ export default function DashboardPage() {
           monthlyExpenses
         });
         
+        console.log("Dashboard - Stats loaded:", {
+          totalEmployees,
+          activeEmployees,
+          dailyAttendance,
+          monthlyExpenses
+        });
+        
       } catch (error) {
-        console.error("Error fetching dashboard data:", error);
+        console.error("Dashboard - Error loading data:", error);
         toast({
           title: "Failed to load dashboard data",
           description: "Please refresh and try again.",
@@ -91,12 +108,13 @@ export default function DashboardPage() {
       }
     };
     
-    fetchDashboardData();
-  }, [toast, session, userProfile]);
+    checkSetupAndFetchData();
+  }, [toast, session, userProfile, authLoading]);
   
-  const handleCompanySetupComplete = () => {
+  const handleCompanySetupComplete = async () => {
+    console.log("Dashboard - Company setup completed, refreshing");
     setNeedsCompanySetup(false);
-    window.location.reload(); // Reload to update all data
+    window.location.reload();
   };
   
   const renderCompanyInfo = () => {
@@ -135,6 +153,19 @@ export default function DashboardPage() {
       </Card>
     );
   };
+  
+  if (authLoading || loading) {
+    return (
+      <Dashboard title="Dashboard">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-adicorp-purple mx-auto"></div>
+            <p className="mt-4 text-white/60">Loading dashboard...</p>
+          </div>
+        </div>
+      </Dashboard>
+    );
+  }
   
   return (
     <Dashboard title="Dashboard">

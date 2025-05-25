@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,7 +6,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { ProfileRow, CompanyRow } from "@/types/supabase";
 
-// Define a type that extends the ProfileRow with an optional companies property
 type UserProfileData = ProfileRow & {
   companies?: CompanyRow | null;
 };
@@ -30,11 +30,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string): Promise<UserProfileData | null> => {
     try {
       console.log("AuthContext - Fetching user profile for:", userId);
       
-      // First get the basic profile data
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -43,13 +42,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (profileError) {
         if (profileError.code === 'PGRST116') {
-          // No profile found, this could be a new user
           console.log("AuthContext - No profile found, creating one");
           
-          // Create a new profile
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
-            .insert({ id: userId })
+            .insert({ 
+              id: userId,
+              is_admin: false
+            })
             .select()
             .single();
             
@@ -59,8 +59,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           
           console.log("AuthContext - New profile created:", newProfile);
-          setUserProfile(newProfile);
-          return newProfile;
+          const profileWithCompany: UserProfileData = { ...newProfile };
+          setUserProfile(profileWithCompany);
+          return profileWithCompany;
         }
         
         console.error("AuthContext - Error fetching user profile:", profileError);
@@ -69,11 +70,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       console.log("AuthContext - User profile fetched successfully:", profileData);
       
-      // Create our extended profile data object
-      const profileDataWithCompany: UserProfileData = { ...profileData };
+      const profileWithCompany: UserProfileData = { ...profileData };
       
-      // If we have a company_id, fetch the company details separately
-      if (profileData && profileData.company_id) {
+      if (profileData?.company_id) {
         console.log("AuthContext - Fetching company data for company_id:", profileData.company_id);
         
         const { data: companyData, error: companyError } = await supabase
@@ -83,67 +82,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .single();
         
         if (!companyError && companyData) {
-          // Add company data to our profile object
-          profileDataWithCompany.companies = companyData;
+          profileWithCompany.companies = companyData;
           console.log("AuthContext - Company data fetched:", companyData);
         } else if (companyError) {
           console.error("AuthContext - Error fetching company data:", companyError);
         }
-      } else {
-        console.log("AuthContext - User has no company_id, skipping company fetch");
       }
       
-      setUserProfile(profileDataWithCompany);
-      return profileDataWithCompany;
+      setUserProfile(profileWithCompany);
+      return profileWithCompany;
     } catch (error) {
       console.error("AuthContext - Exception fetching user profile:", error);
       return null;
     }
   };
 
-  const refreshProfile = async () => {
+  const refreshProfile = async (): Promise<void> => {
     if (user?.id) {
       console.log("AuthContext - Refreshing profile for user:", user.id);
       await fetchUserProfile(user.id);
-      return; // Making sure we explicitly return void
-    } else {
-      console.log("AuthContext - Cannot refresh profile, no user ID available");
-      return; // Making sure we explicitly return void
     }
   };
 
   useEffect(() => {
     console.log("AuthContext - Setting up auth state listener");
     
-    // First set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        console.log("AuthContext - Auth state changed:", event);
+      async (event, currentSession) => {
+        console.log("AuthContext - Auth state changed:", event, currentSession?.user?.id);
+        
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // Handle user profile fetching with setTimeout to avoid recursion
         if (event === 'SIGNED_IN' && currentSession?.user) {
           console.log("AuthContext - User signed in, fetching profile");
-          setTimeout(() => {
-            fetchUserProfile(currentSession.user.id);
-          }, 0);
+          await fetchUserProfile(currentSession.user.id);
         } else if (event === 'SIGNED_OUT') {
+          console.log("AuthContext - User signed out");
           setUserProfile(null);
           sonnerToast.success('Logged out successfully');
         }
+        
+        setLoading(false);
       }
     );
 
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
       console.log("AuthContext - Initial session check:", currentSession ? "Session found" : "No session");
+      
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
         console.log("AuthContext - Found existing session, fetching profile");
-        fetchUserProfile(currentSession.user.id);
+        await fetchUserProfile(currentSession.user.id);
       }
       
       setLoading(false);

@@ -11,19 +11,25 @@ export const PrivateRoute = () => {
 
   useEffect(() => {
     if (!loading && !user) {
+      console.log("PrivateRoute - No authenticated user, showing toast");
       toast.error("Authentication required", {
         description: "Please log in to access this page"
       });
     }
   }, [loading, user]);
 
+  console.log("PrivateRoute - Status:", { loading, user: !!user });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-adicorp-dark">
-        <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple mx-auto" />
+          <p className="mt-4 text-white/60">Checking authentication...</p>
+        </div>
       </div>
     );
   }
 
-  return user ? <Outlet /> : <Navigate to="/auth" state={{ from: location }} />;
+  return user ? <Outlet /> : <Navigate to="/auth" state={{ from: location }} replace />;
 };
