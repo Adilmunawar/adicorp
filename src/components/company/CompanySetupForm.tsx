@@ -89,21 +89,7 @@ export default function CompanySetupForm({ onComplete }: CompanySetupFormProps) 
         const fileExt = logoFile.name.split('.').pop();
         const filePath = `${user.id}-${Date.now()}.${fileExt}`;
         
-        // Ensure the bucket exists
-        try {
-          const { data: bucketData } = await supabase.storage.getBucket('logos');
-          if (!bucketData) {
-            // Create bucket if it doesn't exist
-            await supabase.storage.createBucket('logos', {
-              public: true
-            });
-          }
-        } catch (error) {
-          console.log("Creating logos bucket");
-          await supabase.storage.createBucket('logos', {
-            public: true
-          });
-        }
+        console.log("CompanySetupForm - Uploading logo to:", filePath);
         
         const { error: uploadError, data } = await supabase.storage
           .from('logos')

@@ -105,6 +105,8 @@ export default function CompanySetupModal() {
         const fileExt = logoFile.name.split('.').pop();
         const filePath = `${user.id}-${Date.now()}.${fileExt}`;
         
+        console.log("CompanySetupModal - Uploading logo to:", filePath);
+        
         const { error: uploadError, data } = await supabase.storage
           .from('logos')
           .upload(filePath, logoFile);
@@ -171,9 +173,6 @@ export default function CompanySetupModal() {
       // Navigate to dashboard only if we're not already there
       if (location.pathname !== "/dashboard") {
         navigate("/dashboard", { replace: true });
-      } else {
-        // If already on dashboard, force a reload to update dashboard data
-        window.location.reload();
       }
     } catch (error: any) {
       console.error("CompanySetupModal - Error setting up company:", error);

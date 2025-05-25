@@ -32,21 +32,29 @@ const queryClient = new QueryClient({
 // Function to ensure storage bucket exists for logo uploads
 const ensureStorageBuckets = async () => {
   try {
-    // Check if logos bucket exists, create if not
-    const { data: bucketData } = await supabase.storage.getBucket('logos');
-    if (!bucketData) {
-      console.log("Creating logos storage bucket");
-      await supabase.storage.createBucket('logos', {
+    console.log("Checking if logos bucket exists...");
+    const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('logos');
+    
+    if (bucketError && bucketError.message.includes('Bucket not found')) {
+      console.log("Creating logos storage bucket...");
+      const { error: createError } = await supabase.storage.createBucket('logos', {
         public: true,
         fileSizeLimit: 2097152, // 2MB limit
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
       });
+      
+      if (createError) {
+        console.error("Error creating logos bucket:", createError);
+      } else {
+        console.log("Logos bucket created successfully");
+      }
+    } else if (!bucketError && bucketData) {
+      console.log("Logos bucket already exists");
+    } else if (bucketError) {
+      console.error("Error checking bucket:", bucketError);
     }
   } catch (error) {
-    console.log("Creating logos bucket");
-    await supabase.storage.createBucket('logos', {
-      public: true,
-      fileSizeLimit: 2097152, // 2MB limit
-    });
+    console.error("Exception in ensureStorageBuckets:", error);
   }
 };
 

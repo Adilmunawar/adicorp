@@ -152,6 +152,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_user_company_id: {
+        Args: { user_id: string }
+        Returns: string
+      }
       get_user_profile: {
         Args: { user_id: string }
         Returns: {
@@ -162,6 +166,10 @@ export type Database = {
           is_admin: boolean
           last_name: string | null
         }[]
+      }
+      is_admin: {
+        Args: { user_id: string }
+        Returns: boolean
       }
     }
     Enums: {
