@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency } from "@/types/supabase";
 import { Users, Clock, CalendarCheck, AlertCircle, Building } from "lucide-react";
-import CompanySetupForm from "@/components/company/CompanySetupForm";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 
@@ -14,7 +13,6 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const { session, userProfile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [needsCompanySetup, setNeedsCompanySetup] = useState(false);
   const [stats, setStats] = useState({
     totalEmployees: 0,
     activeEmployees: 0,
@@ -23,30 +21,17 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    const checkSetupAndFetchData = async () => {
+    const fetchData = async () => {
       try {
-        if (authLoading || !session) {
+        if (authLoading || !session || !userProfile?.company_id) {
+          setLoading(false);
           return;
         }
         
         setLoading(true);
-        
-        console.log("Dashboard - Checking company setup:", { 
-          userProfile, 
-          company_id: userProfile?.company_id 
-        });
-        
-        if (!userProfile?.company_id) {
-          console.log("Dashboard - No company setup, showing setup form");
-          setNeedsCompanySetup(true);
-          setLoading(false);
-          return;
-        } else {
-          setNeedsCompanySetup(false);
-        }
-        
         console.log("Dashboard - Fetching dashboard stats for company:", userProfile.company_id);
         
+        // Fetch employees
         const { data: employeeData, error: employeeError } = await supabase
           .from('employees')
           .select('id, status, wage_rate')
@@ -57,23 +42,28 @@ export default function DashboardPage() {
           throw employeeError;
         }
         
-        const today = new Date().toISOString().split('T')[0];
-        
-        const { data: attendanceData, error: attendanceError } = await supabase
-          .from('attendance')
-          .select('id')
-          .eq('date', today)
-          .in('employee_id', employeeData?.map(emp => emp.id) || [])
-          .eq('status', 'present');
-          
-        if (attendanceError && attendanceError.code !== 'PGRST116') {
-          console.error("Dashboard - Error fetching attendance:", attendanceError);
-          throw attendanceError;
-        }
-        
         const totalEmployees = employeeData?.length || 0;
         const activeEmployees = employeeData?.filter(emp => emp.status === 'active').length || 0;
-        const dailyAttendance = attendanceData?.length || 0;
+        
+        let dailyAttendance = 0;
+        
+        // Only fetch attendance if we have employees
+        if (totalEmployees > 0) {
+          const today = new Date().toISOString().split('T')[0];
+          
+          const { data: attendanceData, error: attendanceError } = await supabase
+            .from('attendance')
+            .select('id')
+            .eq('date', today)
+            .in('employee_id', employeeData.map(emp => emp.id))
+            .eq('status', 'present');
+            
+          if (attendanceError && attendanceError.code !== 'PGRST116') {
+            console.error("Dashboard - Error fetching attendance:", attendanceError);
+          } else {
+            dailyAttendance = attendanceData?.length || 0;
+          }
+        }
         
         const monthlyExpenses = employeeData?.reduce((sum, emp) => {
           if (emp.status === 'active') {
@@ -89,7 +79,7 @@ export default function DashboardPage() {
           monthlyExpenses
         });
         
-        console.log("Dashboard - Stats loaded:", {
+        console.log("Dashboard - Stats loaded successfully:", {
           totalEmployees,
           activeEmployees,
           dailyAttendance,
@@ -108,14 +98,8 @@ export default function DashboardPage() {
       }
     };
     
-    checkSetupAndFetchData();
+    fetchData();
   }, [toast, session, userProfile, authLoading]);
-  
-  const handleCompanySetupComplete = async () => {
-    console.log("Dashboard - Company setup completed, refreshing");
-    setNeedsCompanySetup(false);
-    window.location.reload();
-  };
   
   const renderCompanyInfo = () => {
     if (!userProfile?.companies) return null;
@@ -166,102 +150,106 @@ export default function DashboardPage() {
       </Dashboard>
     );
   }
+
+  // Show message if no company is set up
+  if (!userProfile?.company_id) {
+    return (
+      <Dashboard title="Dashboard">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Building className="h-16 w-16 text-adicorp-purple mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Company Setup Required</h2>
+            <p className="text-white/60 mb-4">Please complete your company setup to access the dashboard.</p>
+          </div>
+        </div>
+      </Dashboard>
+    );
+  }
   
   return (
     <Dashboard title="Dashboard">
-      {needsCompanySetup ? (
-        <div className="max-w-md mx-auto">
-          <CompanySetupForm 
-            isOpen={needsCompanySetup}
-            onComplete={handleCompanySetupComplete}
-          />
-        </div>
-      ) : (
-        <>
-          {renderCompanyInfo()}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Employees
-                </CardTitle>
-                <Users className="h-4 w-4 text-adicorp-purple" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalEmployees}</div>
-                <p className="text-xs text-white/60 mt-1">
-                  {stats.activeEmployees} active employees
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Today's Attendance
-                </CardTitle>
-                <Clock className="h-4 w-4 text-adicorp-purple" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.dailyAttendance}</div>
-                <p className="text-xs text-white/60 mt-1">
-                  {stats.totalEmployees > 0
-                    ? `${Math.round((stats.dailyAttendance / stats.totalEmployees) * 100)}% attendance rate`
-                    : "No employees recorded"}
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Monthly Expenses
-                </CardTitle>
-                <CalendarCheck className="h-4 w-4 text-adicorp-purple" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatCurrency(stats.monthlyExpenses)}
-                </div>
-                <p className="text-xs text-white/60 mt-1">
-                  Estimated 30-day expense
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Pending Actions
-                </CardTitle>
-                <AlertCircle className="h-4 w-4 text-adicorp-purple" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-white/60 mt-1">
-                  No pending actions
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {stats.totalEmployees === 0 && (
-            <div className="mt-8 text-center">
-              <Card className="glass-card inline-block p-8">
-                <h3 className="text-xl font-semibold mb-2">Get Started With Your Team</h3>
-                <p className="text-white/70 mb-4">
-                  You haven't added any employees yet. Start building your team now.
-                </p>
-                <Button 
-                  className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-                  onClick={() => window.location.href = '/employees'}
-                >
-                  Add Employees
-                </Button>
-              </Card>
+      {renderCompanyInfo()}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="glass-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              Total Employees
+            </CardTitle>
+            <Users className="h-4 w-4 text-adicorp-purple" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalEmployees}</div>
+            <p className="text-xs text-white/60 mt-1">
+              {stats.activeEmployees} active employees
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              Today's Attendance
+            </CardTitle>
+            <Clock className="h-4 w-4 text-adicorp-purple" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.dailyAttendance}</div>
+            <p className="text-xs text-white/60 mt-1">
+              {stats.totalEmployees > 0
+                ? `${Math.round((stats.dailyAttendance / stats.totalEmployees) * 100)}% attendance rate`
+                : "No employees recorded"}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              Monthly Expenses
+            </CardTitle>
+            <CalendarCheck className="h-4 w-4 text-adicorp-purple" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(stats.monthlyExpenses)}
             </div>
-          )}
-        </>
+            <p className="text-xs text-white/60 mt-1">
+              Estimated 30-day expense
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">
+              Pending Actions
+            </CardTitle>
+            <AlertCircle className="h-4 w-4 text-adicorp-purple" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-white/60 mt-1">
+              No pending actions
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {stats.totalEmployees === 0 && (
+        <div className="mt-8 text-center">
+          <Card className="glass-card inline-block p-8">
+            <h3 className="text-xl font-semibold mb-2">Get Started With Your Team</h3>
+            <p className="text-white/70 mb-4">
+              You haven't added any employees yet. Start building your team now.
+            </p>
+            <Button 
+              className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+              onClick={() => window.location.href = '/employees'}
+            >
+              Add Employees
+            </Button>
+          </Card>
+        </div>
       )}
     </Dashboard>
   );

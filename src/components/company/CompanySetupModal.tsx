@@ -6,7 +6,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Building, Loader2, Upload } from "lucide-react";
@@ -27,7 +26,6 @@ const formSchema = z.object({
   phone: z.string().optional(),
   website: z.string().url({ message: "Please enter a valid URL" }).optional().or(z.literal('')),
   address: z.string().optional(),
-  logo: z.string().optional()
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -49,7 +47,6 @@ export default function CompanySetupModal() {
       phone: "",
       website: "",
       address: "",
-      logo: ""
     }
   });
 
@@ -83,44 +80,59 @@ export default function CompanySetupModal() {
   };
   
   const handleSubmit = async (values: FormValues) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to perform this action.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
     try {
-      if (!user) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to perform this action.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      setIsLoading(true);
       console.log("CompanySetupModal - Creating company:", values);
       
       let logoUrl = null;
       
+      // Upload logo if provided
       if (logoFile) {
-        const fileExt = logoFile.name.split('.').pop();
-        const filePath = `${user.id}-${Date.now()}.${fileExt}`;
-        
-        console.log("CompanySetupModal - Uploading logo to:", filePath);
-        
-        const { error: uploadError } = await supabase.storage
-          .from('logos')
-          .upload(filePath, logoFile);
+        try {
+          const fileExt = logoFile.name.split('.').pop();
+          const filePath = `${user.id}-${Date.now()}.${fileExt}`;
           
-        if (uploadError) {
-          console.error("CompanySetupModal - Logo upload error:", uploadError);
-          throw uploadError;
+          console.log("CompanySetupModal - Uploading logo to:", filePath);
+          
+          const { error: uploadError, data: uploadData } = await supabase.storage
+            .from('logos')
+            .upload(filePath, logoFile);
+            
+          if (uploadError) {
+            console.error("CompanySetupModal - Logo upload error:", uploadError);
+            throw new Error(`Logo upload failed: ${uploadError.message}`);
+          }
+          
+          if (uploadData) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('logos')
+              .getPublicUrl(filePath);
+              
+            logoUrl = publicUrl;
+            console.log("CompanySetupModal - Logo uploaded successfully:", logoUrl);
+          }
+        } catch (logoError) {
+          console.error("CompanySetupModal - Logo upload failed:", logoError);
+          // Continue without logo if upload fails
+          toast({
+            title: "Logo upload failed",
+            description: "Company will be created without logo.",
+            variant: "destructive",
+          });
         }
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('logos')
-          .getPublicUrl(filePath);
-          
-        logoUrl = publicUrl;
-        console.log("CompanySetupModal - Logo uploaded:", logoUrl);
       }
       
+      // Create company
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .insert({
@@ -135,11 +147,12 @@ export default function CompanySetupModal() {
         
       if (companyError) {
         console.error("CompanySetupModal - Company creation error:", companyError);
-        throw companyError;
+        throw new Error(`Company creation failed: ${companyError.message}`);
       }
       
-      console.log("CompanySetupModal - Company created:", companyData);
+      console.log("CompanySetupModal - Company created successfully:", companyData);
       
+      // Update user profile with company_id
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
@@ -150,11 +163,12 @@ export default function CompanySetupModal() {
         
       if (profileError) {
         console.error("CompanySetupModal - Profile update error:", profileError);
-        throw profileError;
+        throw new Error(`Profile update failed: ${profileError.message}`);
       }
       
       console.log("CompanySetupModal - Profile updated successfully");
       
+      // Refresh profile data
       await refreshProfile();
       
       sonnerToast.success("Company setup complete", {
@@ -163,9 +177,11 @@ export default function CompanySetupModal() {
       
       setIsOpen(false);
       
+      // Navigate to dashboard if not already there
       if (location.pathname !== "/dashboard") {
         navigate("/dashboard", { replace: true });
       }
+      
     } catch (error: any) {
       console.error("CompanySetupModal - Error setting up company:", error);
       toast({
@@ -181,11 +197,15 @@ export default function CompanySetupModal() {
   if (!user) return null;
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      if (userProfile && userProfile.company_id) {
-        setIsOpen(open);
-      }
-    }}>
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={(open) => {
+        // Only allow closing if user already has a company
+        if (!open && userProfile?.company_id) {
+          setIsOpen(false);
+        }
+      }}
+    >
       <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center">
@@ -210,6 +230,7 @@ export default function CompanySetupModal() {
                       {...field}
                       className="bg-adicorp-dark/60 border-white/10"
                       placeholder="e.g. Acme Corporation"
+                      disabled={isLoading}
                     />
                   </FormControl>
                   <FormMessage />
@@ -228,6 +249,7 @@ export default function CompanySetupModal() {
                       {...field}
                       className="bg-adicorp-dark/60 border-white/10"
                       placeholder="e.g. +1 (555) 123-4567"
+                      disabled={isLoading}
                     />
                   </FormControl>
                   <FormMessage />
@@ -246,6 +268,7 @@ export default function CompanySetupModal() {
                       {...field}
                       className="bg-adicorp-dark/60 border-white/10"
                       placeholder="e.g. https://www.example.com"
+                      disabled={isLoading}
                     />
                   </FormControl>
                   <FormMessage />
@@ -264,6 +287,7 @@ export default function CompanySetupModal() {
                       {...field}
                       className="bg-adicorp-dark/60 border-white/10"
                       placeholder="e.g. 123 Main Street, City, Country"
+                      disabled={isLoading}
                     />
                   </FormControl>
                   <FormMessage />
@@ -288,6 +312,7 @@ export default function CompanySetupModal() {
                         setLogoPreview(null);
                       }}
                       className="absolute top-0 right-0 bg-black/50 text-white p-1 rounded-bl"
+                      disabled={isLoading}
                     >
                       ×
                     </button>
@@ -300,7 +325,7 @@ export default function CompanySetupModal() {
                 <div>
                   <label 
                     htmlFor="logo-upload" 
-                    className="cursor-pointer px-4 py-2 rounded text-sm bg-adicorp-dark/80 hover:bg-adicorp-dark/60 border border-white/10 flex items-center"
+                    className={`cursor-pointer px-4 py-2 rounded text-sm bg-adicorp-dark/80 hover:bg-adicorp-dark/60 border border-white/10 flex items-center ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     <Upload className="mr-2 h-4 w-4" />
                     Upload Logo
@@ -311,13 +336,14 @@ export default function CompanySetupModal() {
                     accept="image/*"
                     onChange={handleLogoChange}
                     className="hidden"
+                    disabled={isLoading}
                   />
                   <p className="text-xs text-white/50 mt-1">Optional. PNG or JPG recommended</p>
                 </div>
               </div>
             </div>
           
-            <DialogFooter className="pt-4">
+            <div className="pt-4">
               <Button 
                 type="submit"
                 disabled={isLoading || !form.formState.isValid}
@@ -332,7 +358,7 @@ export default function CompanySetupModal() {
                   "Complete Setup"
                 )}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
         </Form>
       </DialogContent>

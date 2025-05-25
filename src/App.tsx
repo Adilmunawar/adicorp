@@ -28,38 +28,9 @@ const queryClient = new QueryClient({
   },
 });
 
-const ensureStorageBuckets = async () => {
-  try {
-    console.log("App - Ensuring storage buckets exist...");
-    const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('logos');
-    
-    if (bucketError && bucketError.message.includes('Bucket not found')) {
-      console.log("App - Creating logos storage bucket...");
-      const { error: createError } = await supabase.storage.createBucket('logos', {
-        public: true,
-        fileSizeLimit: 2097152, // 2MB limit
-        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
-      });
-      
-      if (createError) {
-        console.error("App - Error creating logos bucket:", createError);
-      } else {
-        console.log("App - Logos bucket created successfully");
-      }
-    } else if (!bucketError && bucketData) {
-      console.log("App - Logos bucket already exists");
-    } else if (bucketError) {
-      console.error("App - Error checking bucket:", bucketError);
-    }
-  } catch (error) {
-    console.error("App - Exception in ensureStorageBuckets:", error);
-  }
-};
-
 const App = () => {
   useEffect(() => {
-    console.log("App - Initializing application");
-    ensureStorageBuckets();
+    console.log("App - Application initialized successfully");
   }, []);
 
   return (

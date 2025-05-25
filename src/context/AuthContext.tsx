@@ -34,52 +34,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log("AuthContext - Fetching user profile for:", userId);
       
+      // First try to get existing profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       
       if (profileError) {
-        if (profileError.code === 'PGRST116') {
-          console.log("AuthContext - No profile found, creating one");
-          
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({ 
-              id: userId,
-              is_admin: false
-            })
-            .select()
-            .single();
-            
-          if (createError) {
-            console.error("AuthContext - Error creating new profile:", createError);
-            return null;
-          }
-          
-          console.log("AuthContext - New profile created:", newProfile);
-          const profileWithCompany: UserProfileData = { ...newProfile };
-          setUserProfile(profileWithCompany);
-          return profileWithCompany;
-        }
-        
-        console.error("AuthContext - Error fetching user profile:", profileError);
+        console.error("AuthContext - Error fetching profile:", profileError);
         return null;
       }
       
-      console.log("AuthContext - User profile fetched successfully:", profileData);
+      let profile = profileData;
       
-      const profileWithCompany: UserProfileData = { ...profileData };
+      // If no profile exists, create one
+      if (!profile) {
+        console.log("AuthContext - No profile found, creating one");
+        
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({ 
+            id: userId,
+            is_admin: false
+          })
+          .select()
+          .single();
+          
+        if (createError) {
+          console.error("AuthContext - Error creating profile:", createError);
+          return null;
+        }
+        
+        profile = newProfile;
+        console.log("AuthContext - New profile created:", profile);
+      }
       
-      if (profileData?.company_id) {
-        console.log("AuthContext - Fetching company data for company_id:", profileData.company_id);
+      const profileWithCompany: UserProfileData = { ...profile };
+      
+      // Fetch company data if user has a company_id
+      if (profile?.company_id) {
+        console.log("AuthContext - Fetching company data for company_id:", profile.company_id);
         
         const { data: companyData, error: companyError } = await supabase
           .from('companies')
           .select('*')
-          .eq('id', profileData.company_id)
-          .single();
+          .eq('id', profile.company_id)
+          .maybeSingle();
         
         if (!companyError && companyData) {
           profileWithCompany.companies = companyData;
@@ -107,6 +108,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log("AuthContext - Setting up auth state listener");
     
+    // Get initial session
+    const getInitialSession = async () => {
+      try {
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("AuthContext - Error getting session:", error);
+          setLoading(false);
+          return;
+        }
+        
+        console.log("AuthContext - Initial session check:", currentSession ? "Session found" : "No session");
+        
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        if (currentSession?.user) {
+          console.log("AuthContext - Found existing session, fetching profile");
+          await fetchUserProfile(currentSession.user.id);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("AuthContext - Exception getting session:", error);
+        setLoading(false);
+      }
+    };
+
+    getInitialSession();
+
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
         console.log("AuthContext - Auth state changed:", event, currentSession?.user?.id);
@@ -123,26 +155,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           sonnerToast.success('Logged out successfully');
         }
         
-        setLoading(false);
+        if (!currentSession) {
+          setLoading(false);
+        }
       }
     );
-
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      console.log("AuthContext - Initial session check:", currentSession ? "Session found" : "No session");
-      
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      if (currentSession?.user) {
-        console.log("AuthContext - Found existing session, fetching profile");
-        await fetchUserProfile(currentSession.user.id);
-      }
-      
-      setLoading(false);
-    }).catch(error => {
-      console.error("AuthContext - Error getting session:", error);
-      setLoading(false);
-    });
 
     return () => {
       subscription.unsubscribe();
@@ -152,6 +169,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       console.log("AuthContext - Attempting sign in for:", email);
+      setLoading(true);
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -168,12 +187,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         variant: "destructive",
       });
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
       console.log("AuthContext - Attempting sign up for:", email);
+      setLoading(true);
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -197,12 +220,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         variant: "destructive",
       });
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
     try {
       console.log("AuthContext - Signing out");
+      setLoading(true);
       await supabase.auth.signOut();
     } catch (error: any) {
       console.error("AuthContext - Sign out failed:", error);
@@ -211,6 +237,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
