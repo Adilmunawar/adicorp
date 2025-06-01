@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { 
@@ -15,8 +15,9 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Zap } from "lucide-react";
 import { EmployeeRow } from "@/types/supabase";
+import { dataCache, getCacheKey } from "@/utils/cache";
 
 interface AttendanceRecord {
   id?: string;
@@ -31,15 +32,30 @@ export default function AttendanceTable() {
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateLoading, setDateLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const { userProfile } = useAuth();
   const { toast } = useToast();
-  
+
+  // Memoized employees cache key
+  const employeesCacheKey = useMemo(() => 
+    getCacheKey('employees', userProfile?.company_id || ''), 
+    [userProfile?.company_id]
+  );
+
   const fetchEmployees = async () => {
     try {
       if (!userProfile?.company_id) return;
       
-      console.log("AttendanceTable - Fetching employees");
+      // Check cache first
+      const cachedEmployees = dataCache.get<EmployeeRow[]>(employeesCacheKey);
+      if (cachedEmployees) {
+        console.log("AttendanceTable - Using cached employees");
+        setEmployees(cachedEmployees);
+        return;
+      }
+      
+      console.log("AttendanceTable - Fetching employees from DB");
       
       const { data, error } = await supabase
         .from('employees')
@@ -50,8 +66,12 @@ export default function AttendanceTable() {
         
       if (error) throw error;
       
-      setEmployees(data || []);
-      console.log("AttendanceTable - Fetched employees:", data?.length || 0);
+      const employeeData = data || [];
+      setEmployees(employeeData);
+      
+      // Cache for 10 minutes
+      dataCache.set(employeesCacheKey, employeeData, 10 * 60 * 1000);
+      console.log("AttendanceTable - Cached employees:", employeeData.length);
     } catch (error) {
       console.error("AttendanceTable - Error fetching employees:", error);
       toast({
@@ -62,11 +82,25 @@ export default function AttendanceTable() {
     }
   };
 
-  const fetchAttendance = async (selectedDate: Date) => {
+  const fetchAttendance = async (selectedDate: Date, useCache = true) => {
     try {
       if (!userProfile?.company_id || employees.length === 0) return;
       
+      setDateLoading(true);
       const dateString = selectedDate.toISOString().split('T')[0];
+      const attendanceCacheKey = getCacheKey('attendance', userProfile.company_id, dateString);
+      
+      // Check cache first for instant loading
+      if (useCache) {
+        const cachedAttendance = dataCache.get<AttendanceRecord[]>(attendanceCacheKey);
+        if (cachedAttendance) {
+          console.log("AttendanceTable - Using cached attendance for", dateString);
+          setAttendanceData(cachedAttendance);
+          setDateLoading(false);
+          return;
+        }
+      }
+      
       console.log("AttendanceTable - Fetching attendance for date:", dateString);
       
       const employeeIds = employees.map(emp => emp.id);
@@ -98,7 +132,10 @@ export default function AttendanceTable() {
       });
       
       setAttendanceData(attendanceData);
-      console.log("AttendanceTable - Attendance data loaded:", attendanceData.length);
+      
+      // Cache for faster subsequent access
+      dataCache.set(attendanceCacheKey, attendanceData, 3 * 60 * 1000); // 3 minutes
+      console.log("AttendanceTable - Cached attendance data for", dateString);
     } catch (error) {
       console.error("AttendanceTable - Error fetching attendance:", error);
       toast({
@@ -106,6 +143,8 @@ export default function AttendanceTable() {
         description: "Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setDateLoading(false);
     }
   };
 
@@ -126,6 +165,16 @@ export default function AttendanceTable() {
       fetchAttendance(date);
     }
   }, [employees, date]);
+
+  const handleDateChange = (newDate: Date | undefined) => {
+    if (newDate) {
+      setDate(newDate);
+      // Immediate feedback with cached data if available
+      if (employees.length > 0) {
+        fetchAttendance(newDate, true);
+      }
+    }
+  };
   
   const handleStatusChange = (employeeId: string, status: string) => {
     setAttendanceData(prev => 
@@ -135,6 +184,11 @@ export default function AttendanceTable() {
           : item
       )
     );
+    
+    // Invalidate cache for current date since data changed
+    const dateString = date.toISOString().split('T')[0];
+    const attendanceCacheKey = getCacheKey('attendance', userProfile?.company_id || '', dateString);
+    dataCache.invalidate(attendanceCacheKey);
   };
 
   const saveAttendance = async () => {
@@ -172,8 +226,10 @@ export default function AttendanceTable() {
         description: `Saved attendance for ${updates.length} employees.`,
       });
 
-      // Refresh the data
-      await fetchAttendance(date);
+      // Invalidate cache and refresh data
+      const dateString = date.toISOString().split('T')[0];
+      dataCache.invalidate(`attendance:${userProfile?.company_id}:${dateString}`);
+      await fetchAttendance(date, false); // Force fresh data
     } catch (error) {
       console.error("AttendanceTable - Error saving attendance:", error);
       toast({
@@ -189,11 +245,11 @@ export default function AttendanceTable() {
   const getStatusBadge = (status: string) => {
     switch(status) {
       case 'present':
-        return <Badge className="bg-green-500/20 text-green-400">Present</Badge>;
+        return <Badge className="bg-green-500/20 text-green-400 animate-pulse">Present</Badge>;
       case 'short_leave':
-        return <Badge className="bg-yellow-500/20 text-yellow-400">Short Leave</Badge>;
+        return <Badge className="bg-yellow-500/20 text-yellow-400 animate-pulse">Short Leave</Badge>;
       case 'leave':
-        return <Badge className="bg-red-500/20 text-red-400">Leave</Badge>;
+        return <Badge className="bg-red-500/20 text-red-400 animate-pulse">Leave</Badge>;
       default:
         return <Badge className="bg-gray-500/20 text-gray-400">Not Set</Badge>;
     }
@@ -202,7 +258,10 @@ export default function AttendanceTable() {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+          <span className="text-white/70">Loading employees...</span>
+        </div>
       </div>
     );
   }
@@ -217,27 +276,39 @@ export default function AttendanceTable() {
   
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <Card className="glass-card lg:col-span-1">
+      <Card className="glass-card lg:col-span-1 transform hover:scale-105 transition-transform duration-200">
         <CardHeader>
-          <CardTitle>Select Date</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-adicorp-purple" />
+            Select Date
+            {dateLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex justify-center">
           <Calendar
             mode="single"
             selected={date}
-            onSelect={(date) => date && setDate(date)}
-            className="rounded-md border border-white/10 bg-adicorp-dark/30 p-3"
+            onSelect={handleDateChange}
+            className="rounded-md border border-white/10 bg-adicorp-dark/30 p-3 hover:border-adicorp-purple/50 transition-colors duration-300"
           />
         </CardContent>
       </Card>
       
-      <Card className="glass-card lg:col-span-3">
+      <Card className="glass-card lg:col-span-3 transform hover:scale-[1.01] transition-transform duration-200">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Daily Attendance - {date.toLocaleDateString()}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Daily Attendance - {date.toLocaleDateString()}
+            {dateLoading && (
+              <div className="flex items-center space-x-2">
+                <Loader2 className="h-4 w-4 animate-spin text-adicorp-purple" />
+                <span className="text-sm text-white/60">Loading...</span>
+              </div>
+            )}
+          </CardTitle>
           <Button 
             onClick={saveAttendance}
-            disabled={saving}
-            className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+            disabled={saving || dateLoading}
+            className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow transform hover:scale-105 transition-all duration-200"
           >
             {saving ? (
               <>
@@ -253,49 +324,55 @@ export default function AttendanceTable() {
           </Button>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-white/10 hover:bg-transparent">
-                <TableHead>Employee</TableHead>
-                <TableHead>Position</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {attendanceData.map((record) => (
-                <TableRow 
-                  key={record.employeeId}
-                  className="border-white/10 hover:bg-adicorp-dark/30"
-                >
-                  <TableCell>{record.employeeName}</TableCell>
-                  <TableCell>
-                    {employees.find(emp => emp.id === record.employeeId)?.rank || 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    <Select 
-                      value={record.status} 
-                      onValueChange={(value) => handleStatusChange(record.employeeId, value)}
-                    >
-                      <SelectTrigger className="w-[140px] bg-adicorp-dark/60 border-white/10">
-                        <SelectValue>
-                          {getStatusBadge(record.status)}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="bg-adicorp-dark-light border-white/10">
-                        <SelectItem value="present">Present (Full Day)</SelectItem>
-                        <SelectItem value="short_leave">Short Leave (Half Day)</SelectItem>
-                        <SelectItem value="leave">Leave (Absent)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    {date.toLocaleDateString()}
-                  </TableCell>
+          <div className="overflow-hidden rounded-lg border border-white/10">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Position</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {attendanceData.map((record, index) => (
+                  <TableRow 
+                    key={record.employeeId}
+                    className={`border-white/10 hover:bg-adicorp-purple/10 transition-all duration-300 ${
+                      dateLoading ? 'opacity-60' : 'animate-fade-in'
+                    }`}
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <TableCell className="font-medium">{record.employeeName}</TableCell>
+                    <TableCell>
+                      {employees.find(emp => emp.id === record.employeeId)?.rank || 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <Select 
+                        value={record.status} 
+                        onValueChange={(value) => handleStatusChange(record.employeeId, value)}
+                        disabled={dateLoading}
+                      >
+                        <SelectTrigger className="w-[140px] bg-adicorp-dark/60 border-white/10 hover:border-adicorp-purple/50 transition-colors duration-200">
+                          <SelectValue>
+                            {getStatusBadge(record.status)}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="bg-adicorp-dark-light border-white/10">
+                          <SelectItem value="present">Present (Full Day)</SelectItem>
+                          <SelectItem value="short_leave">Short Leave (Half Day)</SelectItem>
+                          <SelectItem value="leave">Leave (Absent)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      {date.toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
