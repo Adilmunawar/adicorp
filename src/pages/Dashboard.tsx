@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { formatCurrency } from "@/types/supabase";
+import { formatCurrency } from "@/utils/salaryCalculations";
 import { Users, Clock, CalendarCheck, AlertCircle, Building } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -65,9 +64,10 @@ export default function DashboardPage() {
           }
         }
         
+        // Calculate monthly expenses correctly - wage_rate is now monthly salary
         const monthlyExpenses = employeeData?.reduce((sum, emp) => {
           if (emp.status === 'active') {
-            return sum + (Number(emp.wage_rate) * 30);
+            return sum + Number(emp.wage_rate); // wage_rate is monthly salary, not daily
           }
           return sum;
         }, 0) || 0;
@@ -205,7 +205,7 @@ export default function DashboardPage() {
         <Card className="glass-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Monthly Expenses
+              Monthly Salary Budget
             </CardTitle>
             <CalendarCheck className="h-4 w-4 text-adicorp-purple" />
           </CardHeader>
@@ -214,7 +214,7 @@ export default function DashboardPage() {
               {formatCurrency(stats.monthlyExpenses)}
             </div>
             <p className="text-xs text-white/60 mt-1">
-              Estimated 30-day expense
+              Total monthly salaries
             </p>
           </CardContent>
         </Card>

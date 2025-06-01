@@ -23,79 +23,139 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeRow } from "@/types/supabase";
-import { formatCurrency } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth } from "date-fns";
+import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonth } from "@/utils/salaryCalculations";
+
+interface EmployeeSalaryData {
+  employee: EmployeeRow;
+  presentDays: number;
+  shortLeaveDays: number;
+  leaveDays: number;
+  calculatedSalary: number;
+  actualWorkingDays: number;
+  dailyRate: number;
+}
 
 export default function SalaryPage() {
-  const [employees, setEmployees] = useState<EmployeeRow[]>([]);
+  const [employeeSalaryData, setEmployeeSalaryData] = useState<EmployeeSalaryData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { user, session } = useAuth();
+  const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("salary-sheet");
   
-  // Current month name and year
-  const currentMonth = format(new Date(), "MMMM yyyy");
-  
-  // Calculate days in current month
-  const daysInMonth = new Date(
-    new Date().getFullYear(),
-    new Date().getMonth() + 1,
-    0
-  ).getDate();
+  const currentMonth = new Date();
+  const currentMonthName = format(currentMonth, "MMMM yyyy");
+  const totalWorkingDaysThisMonth = getWorkingDaysInMonth(currentMonth);
   
   useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchSalaryData = async () => {
       try {
-        setLoading(true);
-        
-        // Only fetch if we have an authenticated session
-        if (!session || !user) {
-          console.log("No active session, skipping employee fetch");
-          setEmployees([]);
+        if (!userProfile?.company_id) {
           setLoading(false);
           return;
         }
         
-        console.log("Fetching user profile to get company ID");
+        setLoading(true);
+        console.log("Salary - Fetching salary data for company:", userProfile.company_id);
         
-        // Get user's company_id
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single();
-          
-        if (userError) {
-          console.error("Error fetching profile:", userError);
-          throw userError;
-        }
-        
-        if (!userData?.company_id) {
-          throw new Error("Company ID not found.");
-        }
-        
-        console.log("Fetching employees for company:", userData.company_id);
-        
-        const { data, error } = await supabase
+        // Fetch employees
+        const { data: employees, error: employeeError } = await supabase
           .from('employees')
           .select('*')
-          .eq('company_id', userData.company_id)
+          .eq('company_id', userProfile.company_id)
           .eq('status', 'active')
           .order('name');
           
-        if (error) {
-          console.error("Error fetching employees:", error);
-          throw error;
+        if (employeeError) {
+          console.error("Salary - Error fetching employees:", employeeError);
+          throw employeeError;
         }
         
-        console.log("Fetched employees:", data?.length || 0);
-        setEmployees(data || []);
+        if (!employees || employees.length === 0) {
+          setEmployeeSalaryData([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Fetch attendance for current month
+        const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+        const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
+        
+        const employeeIds = employees.map(emp => emp.id);
+        
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance')
+          .select('*')
+          .in('employee_id', employeeIds)
+          .gte('date', monthStart)
+          .lte('date', monthEnd);
+          
+        if (attendanceError && attendanceError.code !== 'PGRST116') {
+          console.error("Salary - Error fetching attendance:", attendanceError);
+          throw attendanceError;
+        }
+        
+        // Process salary data with attendance
+        const attendanceMap = new Map();
+        (attendanceData || []).forEach(record => {
+          const key = record.employee_id;
+          if (!attendanceMap.has(key)) {
+            attendanceMap.set(key, {
+              present: 0,
+              shortLeave: 0,
+              leave: 0
+            });
+          }
+          
+          const stats = attendanceMap.get(key);
+          switch (record.status) {
+            case 'present':
+              stats.present++;
+              break;
+            case 'short_leave':
+              stats.shortLeave++;
+              break;
+            case 'leave':
+              stats.leave++;
+              break;
+          }
+        });
+        
+        const salaryData: EmployeeSalaryData[] = employees.map(employee => {
+          const attendance = attendanceMap.get(employee.id) || {
+            present: 0,
+            shortLeave: 0,
+            leave: 0
+          };
+          
+          const monthlySalary = Number(employee.wage_rate);
+          const salaryCalc = calculateEmployeeSalary(
+            monthlySalary,
+            attendance.present,
+            attendance.shortLeave,
+            currentMonth
+          );
+          
+          return {
+            employee,
+            presentDays: attendance.present,
+            shortLeaveDays: attendance.shortLeave,
+            leaveDays: attendance.leave,
+            calculatedSalary: salaryCalc.calculatedSalary,
+            actualWorkingDays: salaryCalc.actualWorkingDays,
+            dailyRate: salaryCalc.dailyRate
+          };
+        });
+        
+        setEmployeeSalaryData(salaryData);
+        console.log("Salary - Processed salary data:", salaryData.length);
+        
       } catch (error) {
-        console.error("Error fetching employees:", error);
+        console.error("Salary - Error fetching salary data:", error);
         toast({
-          title: "Failed to load employee data",
+          title: "Failed to load salary data",
           description: "Please refresh and try again.",
           variant: "destructive",
         });
@@ -104,17 +164,14 @@ export default function SalaryPage() {
       }
     };
 
-    fetchEmployees();
-  }, [toast, session, user]);
+    fetchSalaryData();
+  }, [toast, userProfile?.company_id, currentMonth]);
   
-  // Calculate total monthly salary
-  const totalSalary = employees.reduce((total, employee) => {
-    return total + (Number(employee.wage_rate) * daysInMonth);
-  }, 0);
-  
-  // Calculate average daily wage
-  const averageDailyWage = employees.length > 0 
-    ? employees.reduce((total, employee) => total + Number(employee.wage_rate), 0) / employees.length
+  // Calculate totals based on actual salary calculations
+  const totalCalculatedSalary = employeeSalaryData.reduce((total, data) => total + data.calculatedSalary, 0);
+  const totalBudgetSalary = employeeSalaryData.reduce((total, data) => total + Number(data.employee.wage_rate), 0);
+  const averageDailyRate = employeeSalaryData.length > 0 
+    ? employeeSalaryData.reduce((total, data) => total + data.dailyRate, 0) / employeeSalaryData.length
     : 0;
   
   return (
@@ -123,18 +180,18 @@ export default function SalaryPage() {
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white/60">
-              Total Monthly Salary
+              Monthly Salary Budget
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
               <CircleDollarSign className="h-5 w-5 mr-2 text-green-400" />
               <span className="text-2xl font-bold">
-                {formatCurrency(totalSalary)}
+                {formatCurrency(totalBudgetSalary)}
               </span>
             </div>
             <p className="text-xs text-white/60 mt-1">
-              For {employees.length} active employees
+              For {employeeSalaryData.length} active employees
             </p>
           </CardContent>
         </Card>
@@ -142,18 +199,18 @@ export default function SalaryPage() {
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white/60">
-              Pay Period
+              Calculated Salary (Attendance-Based)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
               <Calendar className="h-5 w-5 mr-2 text-blue-400" />
               <span className="text-2xl font-bold">
-                {currentMonth}
+                {formatCurrency(totalCalculatedSalary)}
               </span>
             </div>
             <p className="text-xs text-white/60 mt-1">
-              {daysInMonth} working days
+              Based on actual attendance
             </p>
           </CardContent>
         </Card>
@@ -161,18 +218,18 @@ export default function SalaryPage() {
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white/60">
-              Average Daily Wage
+              Average Daily Rate
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
               <Briefcase className="h-5 w-5 mr-2 text-purple-400" />
               <span className="text-2xl font-bold">
-                {formatCurrency(averageDailyWage)}
+                {formatCurrency(averageDailyRate)}
               </span>
             </div>
             <p className="text-xs text-white/60 mt-1">
-              Per employee per day
+              Per employee per working day
             </p>
           </CardContent>
         </Card>
@@ -193,7 +250,7 @@ export default function SalaryPage() {
         <TabsContent value="salary-sheet">
           <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Monthly Salary Sheet - {currentMonth}</CardTitle>
+              <CardTitle>Attendance-Based Salary Sheet - {currentMonthName}</CardTitle>
               <Button 
                 className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
               >
@@ -206,7 +263,7 @@ export default function SalaryPage() {
                 <div className="flex justify-center items-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
                 </div>
-              ) : employees.length === 0 ? (
+              ) : employeeSalaryData.length === 0 ? (
                 <div className="text-center py-8 text-white/70">
                   <p>No active employees found. Add employees to generate salary sheets.</p>
                 </div>
@@ -216,28 +273,34 @@ export default function SalaryPage() {
                     <TableRow className="border-white/10 hover:bg-transparent">
                       <TableHead>Employee</TableHead>
                       <TableHead>Position</TableHead>
+                      <TableHead>Monthly Salary</TableHead>
                       <TableHead>Daily Rate</TableHead>
                       <TableHead>Working Days</TableHead>
-                      <TableHead>Monthly Salary</TableHead>
+                      <TableHead>Calculated Salary</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {employees.map((employee) => (
+                    {employeeSalaryData.map((data) => (
                       <TableRow 
-                        key={employee.id} 
+                        key={data.employee.id} 
                         className="border-white/10 hover:bg-adicorp-dark/30"
                       >
-                        <TableCell className="font-medium">{employee.name}</TableCell>
-                        <TableCell>{employee.rank}</TableCell>
-                        <TableCell>{formatCurrency(Number(employee.wage_rate))}</TableCell>
-                        <TableCell>{daysInMonth}</TableCell>
-                        <TableCell className="font-bold">
-                          {formatCurrency(Number(employee.wage_rate) * daysInMonth)}
+                        <TableCell className="font-medium">{data.employee.name}</TableCell>
+                        <TableCell>{data.employee.rank}</TableCell>
+                        <TableCell>{formatCurrency(Number(data.employee.wage_rate))}</TableCell>
+                        <TableCell>{formatCurrency(data.dailyRate)}</TableCell>
+                        <TableCell>{data.actualWorkingDays} / {totalWorkingDaysThisMonth}</TableCell>
+                        <TableCell className="font-bold text-green-400">
+                          {formatCurrency(data.calculatedSalary)}
                         </TableCell>
                         <TableCell>
-                          <Badge className="bg-blue-500/20 text-blue-400">
-                            Pending
+                          <Badge className={
+                            data.actualWorkingDays > 0 
+                              ? "bg-green-500/20 text-green-400" 
+                              : "bg-red-500/20 text-red-400"
+                          }>
+                            {data.actualWorkingDays > 0 ? "Earned" : "No Attendance"}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -252,26 +315,26 @@ export default function SalaryPage() {
         <TabsContent value="payslips">
           <Card className="glass-card">
             <CardHeader>
-              <CardTitle>Individual Payslips - {currentMonth}</CardTitle>
+              <CardTitle>Individual Payslips - {currentMonthName}</CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="flex justify-center items-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
                 </div>
-              ) : employees.length === 0 ? (
+              ) : employeeSalaryData.length === 0 ? (
                 <div className="text-center py-8 text-white/70">
                   <p>No active employees found. Add employees to generate payslips.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {employees.map((employee) => (
-                    <Card key={employee.id} className="bg-adicorp-dark-light/40 border-white/5">
+                  {employeeSalaryData.map((data) => (
+                    <Card key={data.employee.id} className="bg-adicorp-dark-light/40 border-white/5">
                       <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                           <div>
-                            <CardTitle className="text-lg">{employee.name}</CardTitle>
-                            <p className="text-sm text-white/60">{employee.rank}</p>
+                            <CardTitle className="text-lg">{data.employee.name}</CardTitle>
+                            <p className="text-sm text-white/60">{data.employee.rank}</p>
                           </div>
                           <Button size="sm" variant="outline" className="border-white/10 hover:bg-adicorp-dark">
                             <Download className="h-4 w-4" />
@@ -281,21 +344,29 @@ export default function SalaryPage() {
                       <CardContent>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
+                            <span className="text-white/60">Monthly Salary:</span>
+                            <span>{formatCurrency(Number(data.employee.wage_rate))}</span>
+                          </div>
+                          <div className="flex justify-between">
                             <span className="text-white/60">Daily Rate:</span>
-                            <span>{formatCurrency(Number(employee.wage_rate))}</span>
+                            <span>{formatCurrency(data.dailyRate)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-white/60">Working Days:</span>
-                            <span>{daysInMonth}</span>
+                            <span>{data.actualWorkingDays} / {totalWorkingDaysThisMonth}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-white/60">Deductions:</span>
-                            <span>{formatCurrency(0)}</span>
+                            <span className="text-white/60">Present Days:</span>
+                            <span>{data.presentDays}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/60">Short Leave:</span>
+                            <span>{data.shortLeaveDays} (0.5 each)</span>
                           </div>
                           <div className="flex justify-between font-bold pt-2 border-t border-white/10">
-                            <span>Net Salary:</span>
+                            <span>Calculated Salary:</span>
                             <span className="text-green-400">
-                              {formatCurrency(Number(employee.wage_rate) * daysInMonth)}
+                              {formatCurrency(data.calculatedSalary)}
                             </span>
                           </div>
                         </div>
