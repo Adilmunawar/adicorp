@@ -1,73 +1,131 @@
-# Welcome to your Lovable project
+#  Adicorp - Advanced Human Resource Management System
 
-## Project info
+[![GitHub stars](https://img.shields.io/github/stars/Adilmunawar/adicorp.svg)](https://github.com/Adilmunawar/adicorp/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Adilmunawar/adicorp.svg)](https://github.com/Adilmunawar/adicorp/network)
+[![GitHub issues](https://img.shields.io/github/issues/Adilmunawar/adicorp.svg)](https://github.com/Adilmunawar/adicorp/issues)
+[![License](https://img.shields.io/github/license/Adilmunawar/adicorp.svg)](https://github.com/Adilmunawar/adicorp/blob/main/LICENSE)
 
-**URL**: https://lovable.dev/projects/00ce6526-3f3b-4962-a78d-d82c6b927c4a
+## 🌟 Overview
 
-## How can I edit this code?
+**Adicorp** is a comprehensive Human Resource Management System (HRMS) designed to streamline and automate HR processes for modern businesses. Developed by **Adil Munawar**, this advanced system provides a complete solution for managing employee data, attendance tracking, payroll processing, and generating detailed reports.
 
-There are several ways of editing your application.
+## 📁 Directory Structure
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/00ce6526-3f3b-4962-a78d-d82c6b927c4a) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+adicorp/
+│
+├── 📂 app/                          # Core application logic
+│   ├── 📂 Controllers/              # Request handlers
+│   ├── 📂 Models/                   # Data models
+│   ├── 📂 Services/                 # Business logic services
+│   └── 📂 Middleware/               # Authentication & validation
+│
+├── 📂 database/                     # Database related files
+│   ├── 📂 migrations/               # Database schema migrations
+│   ├── 📂 seeders/                  # Sample data seeders
+│   └── 📂 factories/                # Model factories
+│
+├── 📂 resources/                    # Frontend resources
+│   ├── 📂 views/                    # HTML templates
+│   ├── 📂 js/                       # JavaScript files
+│   ├── 📂 css/                      # Stylesheets
+│   └── 📂 assets/                   # Images and other assets
+│
+├── 📂 public/                       # Publicly accessible files
+│   ├── 📂 css/                      # Compiled CSS
+│   ├── 📂 js/                       # Compiled JavaScript
+│   └── 📂 uploads/                  # User uploaded files
+│
+├── 📂 storage/                      # Application storage
+│   ├── 📂 logs/                     # Application logs
+│   └── 📂 reports/                  # Generated reports
+│
+├── 📂 tests/                        # Test suites
+│   ├── 📂 Unit/                     # Unit tests
+│   └── 📂 Feature/                  # Feature tests
+│
+├── 📂 config/                       # Configuration files
+├── 📂 routes/                       # Application routes
+├── 📂 docs/                         # Documentation
+├── 📄 .env.example                  # Environment template
+├── 📄 composer.json                 # PHP dependencies
+├── 📄 package.json                  # Node.js dependencies
+└── 📄 README.md                     # This file
 ```
 
-**Edit a file directly in GitHub**
+## 🤝 Contributing
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+We welcome contributions from the community! Here's how you can help:
 
-**Use GitHub Codespaces**
+### **Getting Started**
+1. **Fork the Repository**
+2. **Create a Feature Branch**
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+3. **Make Your Changes**
+4. **Add Tests** (if applicable)
+5. **Commit Your Changes**
+   ```bash
+   git commit -m 'Add some amazing feature'
+   ```
+6. **Push to the Branch**
+   ```bash
+   git push origin feature/amazing-feature
+   ```
+7. **Open a Pull Request**
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### **Contribution Guidelines**
+- Follow the existing code style and conventions
+- Write clear, concise commit messages
+- Add tests for new features
+- Update documentation as needed
+- Ensure all tests pass before submitting
 
-## What technologies are used for this project?
+## 🗺️ Roadmap
 
-This project is built with:
+### **Version 2.1 (Future)**
+- [ ] Biometric attendance integration
+- [ ] Employee self-service portal
+- [ ] Advanced reporting with ML insights
+- [ ] Cloud deployment options
+- [ ] API rate limiting and caching
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📄 License
 
-## How can I deploy this project?
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-Simply open [Lovable](https://lovable.dev/projects/00ce6526-3f3b-4962-a78d-d82c6b927c4a) and click on Share -> Publish.
+### **Community Support**
+- [GitHub Discussions](https://github.com/Adilmunawar/adicorp/discussions)
+- [Issue Tracker](https://github.com/Adilmunawar/adicorp/issues)
 
-## Can I connect a custom domain to my Lovable project?
+### **Professional Support**
+For enterprise support and custom development, please contact us directly.
 
-Yes, you can!
+## 📞 Contact
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### **Developer**
+**Adil Munawar** - *Lead Developer & Architect*
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### **Connect With Me**
+- 📧 **Email**: [adilmunawarx@gmail.com](mailto:adilmunawarx@gmail.com)
+- 🐙 **GitHub**: [@Adilmunawar](https://github.com/Adilmunawar)
+- 📸 **Instagram**: [@adilmunawarx](https://instagram.com/adilmunawarx)
+- 💼 **LinkedIn**: [Connect with me](https://linkedin.com/in/adilmunawar)
+- 🐦 **Twitter**: [@adilmunawarx](https://twitter.com/adilmunawarx)
+
+### **Project Links**
+- 🌐 **Live Demo**: [https://adicorp-demo.herokuapp.com](https://adicorp.vercel.com)
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/Adilmunawar/adicorp/issues)
+
+---
+
+<div align="center">
+
+**⭐ Star this repository if you find it helpful!**
+
+Made with ❤️ by [Adil Munawar](https://github.com/Adilmunawar)
+
+*Empowering businesses through innovative HR solutions*
+
+</div>
