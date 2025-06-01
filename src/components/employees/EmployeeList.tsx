@@ -29,7 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeRow } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
-import { formatCurrency } from "@/types/supabase";
+import { formatCurrency } from "@/utils/salaryCalculations";
 import { useAuth } from "@/context/AuthContext";
 import { toast as sonnerToast } from "sonner";
 import { 
