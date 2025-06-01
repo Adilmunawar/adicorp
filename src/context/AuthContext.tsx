@@ -102,7 +102,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         console.log("AuthContext - Initializing authentication");
         
-        // Get initial session
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -134,7 +133,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
         if (!mounted || !isInitialized) return;
@@ -145,6 +143,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_IN' && currentSession?.user) {
+          sonnerToast.success('Successfully logged in!', {
+            description: 'Welcome back to AdiCorp Management'
+          });
           await fetchUserProfile(currentSession.user.id);
         } else if (event === 'SIGNED_OUT') {
           setUserProfile(null);

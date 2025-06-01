@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ interface EmployeeSalaryData {
 export default function SalaryPage() {
   const [employeeSalaryData, setEmployeeSalaryData] = useState<EmployeeSalaryData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
   const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("salary-sheet");
@@ -48,131 +49,188 @@ export default function SalaryPage() {
   const currentMonth = new Date();
   const currentMonthName = format(currentMonth, "MMMM yyyy");
   const totalWorkingDaysThisMonth = getWorkingDaysInMonth(currentMonth);
+
+  // Memoized calculations for better performance
+  const salaryStats = useMemo(() => {
+    const totalCalculatedSalary = employeeSalaryData.reduce((total, data) => total + data.calculatedSalary, 0);
+    const totalBudgetSalary = employeeSalaryData.reduce((total, data) => total + Number(data.employee.wage_rate), 0);
+    const averageDailyRate = employeeSalaryData.length > 0 
+      ? employeeSalaryData.reduce((total, data) => total + data.dailyRate, 0) / employeeSalaryData.length
+      : 0;
+    
+    return {
+      totalCalculatedSalary,
+      totalBudgetSalary,
+      averageDailyRate
+    };
+  }, [employeeSalaryData]);
   
-  useEffect(() => {
-    const fetchSalaryData = async () => {
-      try {
-        if (!userProfile?.company_id) {
-          setLoading(false);
-          return;
-        }
-        
-        setLoading(true);
-        console.log("Salary - Fetching salary data for company:", userProfile.company_id);
-        
-        // Fetch employees
-        const { data: employees, error: employeeError } = await supabase
+  const fetchSalaryData = useCallback(async () => {
+    try {
+      if (!userProfile?.company_id) {
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      console.log("Salary - Fetching salary data for company:", userProfile.company_id);
+      
+      const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+      const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
+      
+      // Fetch employees and attendance in parallel for better performance
+      const [employeesResult, attendanceResult] = await Promise.all([
+        supabase
           .from('employees')
           .select('*')
           .eq('company_id', userProfile.company_id)
           .eq('status', 'active')
-          .order('name');
-          
-        if (employeeError) {
-          console.error("Salary - Error fetching employees:", employeeError);
-          throw employeeError;
-        }
-        
-        if (!employees || employees.length === 0) {
-          setEmployeeSalaryData([]);
-          setLoading(false);
-          return;
-        }
-        
-        // Fetch attendance for current month
-        const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-        const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-        
-        const employeeIds = employees.map(emp => emp.id);
-        
-        const { data: attendanceData, error: attendanceError } = await supabase
+          .order('name'),
+        supabase
           .from('attendance')
           .select('*')
-          .in('employee_id', employeeIds)
           .gte('date', monthStart)
-          .lte('date', monthEnd);
-          
-        if (attendanceError && attendanceError.code !== 'PGRST116') {
-          console.error("Salary - Error fetching attendance:", attendanceError);
-          throw attendanceError;
-        }
-        
-        // Process salary data with attendance
-        const attendanceMap = new Map();
-        (attendanceData || []).forEach(record => {
-          const key = record.employee_id;
-          if (!attendanceMap.has(key)) {
-            attendanceMap.set(key, {
-              present: 0,
-              shortLeave: 0,
-              leave: 0
-            });
-          }
-          
-          const stats = attendanceMap.get(key);
-          switch (record.status) {
-            case 'present':
-              stats.present++;
-              break;
-            case 'short_leave':
-              stats.shortLeave++;
-              break;
-            case 'leave':
-              stats.leave++;
-              break;
-          }
-        });
-        
-        const salaryData: EmployeeSalaryData[] = employees.map(employee => {
-          const attendance = attendanceMap.get(employee.id) || {
+          .lte('date', monthEnd)
+      ]);
+      
+      if (employeesResult.error) {
+        console.error("Salary - Error fetching employees:", employeesResult.error);
+        throw employeesResult.error;
+      }
+      
+      if (attendanceResult.error && attendanceResult.error.code !== 'PGRST116') {
+        console.error("Salary - Error fetching attendance:", attendanceResult.error);
+        throw attendanceResult.error;
+      }
+      
+      const employees = employeesResult.data || [];
+      const attendanceData = attendanceResult.data || [];
+      
+      if (employees.length === 0) {
+        setEmployeeSalaryData([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Filter attendance for current company employees
+      const employeeIds = employees.map(emp => emp.id);
+      const filteredAttendance = attendanceData.filter(att => employeeIds.includes(att.employee_id));
+      
+      // Process attendance data efficiently
+      const attendanceMap = new Map();
+      filteredAttendance.forEach(record => {
+        const key = record.employee_id;
+        if (!attendanceMap.has(key)) {
+          attendanceMap.set(key, {
             present: 0,
             shortLeave: 0,
             leave: 0
-          };
-          
-          const monthlySalary = Number(employee.wage_rate);
-          const salaryCalc = calculateEmployeeSalary(
-            monthlySalary,
-            attendance.present,
-            attendance.shortLeave,
-            currentMonth
-          );
-          
-          return {
-            employee,
-            presentDays: attendance.present,
-            shortLeaveDays: attendance.shortLeave,
-            leaveDays: attendance.leave,
-            calculatedSalary: salaryCalc.calculatedSalary,
-            actualWorkingDays: salaryCalc.actualWorkingDays,
-            dailyRate: salaryCalc.dailyRate
-          };
-        });
+          });
+        }
         
-        setEmployeeSalaryData(salaryData);
-        console.log("Salary - Processed salary data:", salaryData.length);
+        const stats = attendanceMap.get(key);
+        switch (record.status) {
+          case 'present':
+            stats.present++;
+            break;
+          case 'short_leave':
+            stats.shortLeave++;
+            break;
+          case 'leave':
+            stats.leave++;
+            break;
+        }
+      });
+      
+      const salaryData: EmployeeSalaryData[] = employees.map(employee => {
+        const attendance = attendanceMap.get(employee.id) || {
+          present: 0,
+          shortLeave: 0,
+          leave: 0
+        };
         
-      } catch (error) {
-        console.error("Salary - Error fetching salary data:", error);
-        toast({
-          title: "Failed to load salary data",
-          description: "Please refresh and try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+        const monthlySalary = Number(employee.wage_rate);
+        const salaryCalc = calculateEmployeeSalary(
+          monthlySalary,
+          attendance.present,
+          attendance.shortLeave,
+          currentMonth
+        );
+        
+        return {
+          employee,
+          presentDays: attendance.present,
+          shortLeaveDays: attendance.shortLeave,
+          leaveDays: attendance.leave,
+          calculatedSalary: salaryCalc.calculatedSalary,
+          actualWorkingDays: salaryCalc.actualWorkingDays,
+          dailyRate: salaryCalc.dailyRate
+        };
+      });
+      
+      setEmployeeSalaryData(salaryData);
+      console.log("Salary - Processed salary data:", salaryData.length);
+      
+    } catch (error) {
+      console.error("Salary - Error fetching salary data:", error);
+      toast({
+        title: "Failed to load salary data",
+        description: "Please refresh and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [userProfile?.company_id, currentMonth, toast]);
 
+  useEffect(() => {
     fetchSalaryData();
-  }, [toast, userProfile?.company_id, currentMonth]);
-  
-  // Calculate totals based on actual salary calculations
-  const totalCalculatedSalary = employeeSalaryData.reduce((total, data) => total + data.calculatedSalary, 0);
-  const totalBudgetSalary = employeeSalaryData.reduce((total, data) => total + Number(data.employee.wage_rate), 0);
-  const averageDailyRate = employeeSalaryData.length > 0 
-    ? employeeSalaryData.reduce((total, data) => total + data.dailyRate, 0) / employeeSalaryData.length
-    : 0;
+  }, [fetchSalaryData]);
+
+  const handleDownload = useCallback(async (type: 'salary-sheet' | 'payslips') => {
+    setDownloading(true);
+    try {
+      // Create CSV content
+      let csvContent = '';
+      
+      if (type === 'salary-sheet') {
+        csvContent = 'Employee,Position,Monthly Salary,Daily Rate,Working Days,Calculated Salary,Status\n';
+        employeeSalaryData.forEach(data => {
+          csvContent += `"${data.employee.name}","${data.employee.rank}","${formatCurrency(Number(data.employee.wage_rate))}","${formatCurrency(data.dailyRate)}","${data.actualWorkingDays}/${totalWorkingDaysThisMonth}","${formatCurrency(data.calculatedSalary)}","${data.actualWorkingDays > 0 ? 'Earned' : 'No Attendance'}"\n`;
+        });
+      } else {
+        csvContent = 'Employee,Position,Monthly Salary,Daily Rate,Present Days,Short Leave,Working Days,Calculated Salary\n';
+        employeeSalaryData.forEach(data => {
+          csvContent += `"${data.employee.name}","${data.employee.rank}","${formatCurrency(Number(data.employee.wage_rate))}","${formatCurrency(data.dailyRate)}","${data.presentDays}","${data.shortLeaveDays}","${data.actualWorkingDays}/${totalWorkingDaysThisMonth}","${formatCurrency(data.calculatedSalary)}"\n`;
+        });
+      }
+      
+      // Download CSV
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${type}-${currentMonthName.replace(' ', '-')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Download completed",
+        description: `${type} exported successfully`,
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download failed",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  }, [employeeSalaryData, currentMonthName, totalWorkingDaysThisMonth, toast]);
   
   return (
     <Dashboard title="Salary Management">
@@ -187,7 +245,7 @@ export default function SalaryPage() {
             <div className="flex items-center">
               <CircleDollarSign className="h-5 w-5 mr-2 text-green-400" />
               <span className="text-2xl font-bold">
-                {formatCurrency(totalBudgetSalary)}
+                {formatCurrency(salaryStats.totalBudgetSalary)}
               </span>
             </div>
             <p className="text-xs text-white/60 mt-1">
@@ -206,7 +264,7 @@ export default function SalaryPage() {
             <div className="flex items-center">
               <Calendar className="h-5 w-5 mr-2 text-blue-400" />
               <span className="text-2xl font-bold">
-                {formatCurrency(totalCalculatedSalary)}
+                {formatCurrency(salaryStats.totalCalculatedSalary)}
               </span>
             </div>
             <p className="text-xs text-white/60 mt-1">
@@ -225,7 +283,7 @@ export default function SalaryPage() {
             <div className="flex items-center">
               <Briefcase className="h-5 w-5 mr-2 text-purple-400" />
               <span className="text-2xl font-bold">
-                {formatCurrency(averageDailyRate)}
+                {formatCurrency(salaryStats.averageDailyRate)}
               </span>
             </div>
             <p className="text-xs text-white/60 mt-1">
@@ -253,8 +311,14 @@ export default function SalaryPage() {
               <CardTitle>Attendance-Based Salary Sheet - {currentMonthName}</CardTitle>
               <Button 
                 className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                onClick={() => handleDownload('salary-sheet')}
+                disabled={downloading || loading}
               >
-                <Download className="mr-2 h-4 w-4" />
+                {downloading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
                 Export
               </Button>
             </CardHeader>
@@ -314,8 +378,20 @@ export default function SalaryPage() {
         
         <TabsContent value="payslips">
           <Card className="glass-card">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Individual Payslips - {currentMonthName}</CardTitle>
+              <Button 
+                className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                onClick={() => handleDownload('payslips')}
+                disabled={downloading || loading}
+              >
+                {downloading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Export All
+              </Button>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -336,7 +412,20 @@ export default function SalaryPage() {
                             <CardTitle className="text-lg">{data.employee.name}</CardTitle>
                             <p className="text-sm text-white/60">{data.employee.rank}</p>
                           </div>
-                          <Button size="sm" variant="outline" className="border-white/10 hover:bg-adicorp-dark">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="border-white/10 hover:bg-adicorp-dark"
+                            onClick={() => {
+                              const csvContent = `Employee: ${data.employee.name}\nPosition: ${data.employee.rank}\nMonthly Salary: ${formatCurrency(Number(data.employee.wage_rate))}\nDaily Rate: ${formatCurrency(data.dailyRate)}\nWorking Days: ${data.actualWorkingDays}/${totalWorkingDaysThisMonth}\nPresent Days: ${data.presentDays}\nShort Leave: ${data.shortLeaveDays}\nCalculated Salary: ${formatCurrency(data.calculatedSalary)}`;
+                              const blob = new Blob([csvContent], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `payslip-${data.employee.name}-${currentMonthName.replace(' ', '-')}.txt`;
+                              link.click();
+                            }}
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>

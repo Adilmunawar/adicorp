@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,132 +47,194 @@ export default function ReportsPage() {
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [attendanceReport, setAttendanceReport] = useState<AttendanceReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const [currentMonth] = useState(new Date());
   const { userProfile } = useAuth();
   const { toast } = useToast();
-  
-  useEffect(() => {
-    const fetchReportsData = async () => {
-      try {
-        if (!userProfile?.company_id) {
-          setLoading(false);
-          return;
-        }
-        
-        setLoading(true);
-        console.log("Reports - Fetching data for company:", userProfile.company_id);
-        
-        // Fetch employees
-        const { data: employeeData, error: employeeError } = await supabase
+
+  // Memoized calculations for better performance
+  const reportStats = useMemo(() => {
+    const totalCalculatedSalary = attendanceReport.reduce((sum, report) => sum + report.calculatedSalary, 0);
+    const totalEmployees = attendanceReport.length;
+    const averageAttendance = totalEmployees > 0 
+      ? attendanceReport.reduce((sum, report) => sum + report.actualWorkingDays, 0) / totalEmployees
+      : 0;
+    const totalWorkingDaysThisMonth = getWorkingDaysInMonth(currentMonth);
+    
+    return {
+      totalCalculatedSalary,
+      totalEmployees,
+      averageAttendance,
+      totalWorkingDaysThisMonth
+    };
+  }, [attendanceReport, currentMonth]);
+
+  const fetchReportsData = useCallback(async () => {
+    try {
+      if (!userProfile?.company_id) {
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      console.log("Reports - Fetching data for company:", userProfile.company_id);
+      
+      const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+      const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
+      
+      // Fetch employees and attendance in parallel
+      const [employeeResult, attendanceResult] = await Promise.all([
+        supabase
           .from('employees')
           .select('*')
           .eq('company_id', userProfile.company_id)
           .eq('status', 'active')
-          .order('name');
-          
-        if (employeeError) throw employeeError;
+          .order('name'),
+        supabase
+          .from('attendance')
+          .select('*')
+          .gte('date', monthStart)
+          .lte('date', monthEnd)
+      ]);
         
-        setEmployees(employeeData || []);
-        
-        if (employeeData && employeeData.length > 0) {
-          // Fetch attendance for current month
-          const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-          const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-          
-          const employeeIds = employeeData.map(emp => emp.id);
-          
-          const { data: attendanceData, error: attendanceError } = await supabase
-            .from('attendance')
-            .select('*')
-            .in('employee_id', employeeIds)
-            .gte('date', monthStart)
-            .lte('date', monthEnd);
-            
-          if (attendanceError && attendanceError.code !== 'PGRST116') {
-            throw attendanceError;
-          }
-          
-          // Process attendance report with proper salary calculations
-          const attendanceMap = new Map();
-          (attendanceData || []).forEach(record => {
-            const key = record.employee_id;
-            if (!attendanceMap.has(key)) {
-              attendanceMap.set(key, {
-                present: 0,
-                shortLeave: 0,
-                leave: 0
-              });
-            }
-            
-            const stats = attendanceMap.get(key);
-            switch (record.status) {
-              case 'present':
-                stats.present++;
-                break;
-              case 'short_leave':
-                stats.shortLeave++;
-                break;
-              case 'leave':
-                stats.leave++;
-                break;
-            }
+      if (employeeResult.error) throw employeeResult.error;
+      if (attendanceResult.error && attendanceResult.error.code !== 'PGRST116') throw attendanceResult.error;
+      
+      const employeeData = employeeResult.data || [];
+      setEmployees(employeeData);
+      
+      if (employeeData.length === 0) {
+        setAttendanceReport([]);
+        setLoading(false);
+        return;
+      }
+      
+      const attendanceData = attendanceResult.data || [];
+      const employeeIds = employeeData.map(emp => emp.id);
+      const filteredAttendance = attendanceData.filter(att => employeeIds.includes(att.employee_id));
+      
+      // Process attendance efficiently
+      const attendanceMap = new Map();
+      filteredAttendance.forEach(record => {
+        const key = record.employee_id;
+        if (!attendanceMap.has(key)) {
+          attendanceMap.set(key, {
+            present: 0,
+            shortLeave: 0,
+            leave: 0
           });
-          
-          const reportData: AttendanceReport[] = employeeData.map(employee => {
-            const attendance = attendanceMap.get(employee.id) || {
-              present: 0,
-              shortLeave: 0,
-              leave: 0
-            };
-            
-            const monthlySalary = Number(employee.wage_rate); // wage_rate now stores monthly salary
-            const salaryCalc = calculateEmployeeSalary(
-              monthlySalary,
-              attendance.present,
-              attendance.shortLeave,
-              currentMonth
-            );
-            
-            return {
-              employeeId: employee.id,
-              employeeName: employee.name,
-              rank: employee.rank,
-              monthlySalary,
-              presentDays: attendance.present,
-              shortLeaveDays: attendance.shortLeave,
-              leaveDays: attendance.leave,
-              totalWorkingDaysInMonth: salaryCalc.totalWorkingDays,
-              actualWorkingDays: salaryCalc.actualWorkingDays,
-              dailyRate: salaryCalc.dailyRate,
-              calculatedSalary: salaryCalc.calculatedSalary
-            };
-          });
-          
-          setAttendanceReport(reportData);
-          console.log("Reports - Processed attendance report:", reportData.length);
         }
         
-      } catch (error) {
-        console.error("Reports - Error loading data:", error);
-        toast({
-          title: "Failed to load reports data",
-          description: "Please refresh and try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchReportsData();
+        const stats = attendanceMap.get(key);
+        switch (record.status) {
+          case 'present':
+            stats.present++;
+            break;
+          case 'short_leave':
+            stats.shortLeave++;
+            break;
+          case 'leave':
+            stats.leave++;
+            break;
+        }
+      });
+      
+      const reportData: AttendanceReport[] = employeeData.map(employee => {
+        const attendance = attendanceMap.get(employee.id) || {
+          present: 0,
+          shortLeave: 0,
+          leave: 0
+        };
+        
+        const monthlySalary = Number(employee.wage_rate);
+        const salaryCalc = calculateEmployeeSalary(
+          monthlySalary,
+          attendance.present,
+          attendance.shortLeave,
+          currentMonth
+        );
+        
+        return {
+          employeeId: employee.id,
+          employeeName: employee.name,
+          rank: employee.rank,
+          monthlySalary,
+          presentDays: attendance.present,
+          shortLeaveDays: attendance.shortLeave,
+          leaveDays: attendance.leave,
+          totalWorkingDaysInMonth: salaryCalc.totalWorkingDays,
+          actualWorkingDays: salaryCalc.actualWorkingDays,
+          dailyRate: salaryCalc.dailyRate,
+          calculatedSalary: salaryCalc.calculatedSalary
+        };
+      });
+      
+      setAttendanceReport(reportData);
+      console.log("Reports - Processed attendance report:", reportData.length);
+      
+    } catch (error) {
+      console.error("Reports - Error loading data:", error);
+      toast({
+        title: "Failed to load reports data",
+        description: "Please refresh and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [userProfile?.company_id, currentMonth, toast]);
   
-  const totalCalculatedSalary = attendanceReport.reduce((sum, report) => sum + report.calculatedSalary, 0);
-  const totalEmployees = attendanceReport.length;
-  const averageAttendance = totalEmployees > 0 
-    ? attendanceReport.reduce((sum, report) => sum + report.actualWorkingDays, 0) / totalEmployees
-    : 0;
-  const totalWorkingDaysThisMonth = getWorkingDaysInMonth(currentMonth);
+  useEffect(() => {
+    fetchReportsData();
+  }, [fetchReportsData]);
+
+  const handleDownload = useCallback(async (type: 'attendance' | 'salary') => {
+    setDownloading(true);
+    try {
+      let csvContent = '';
+      
+      if (type === 'attendance') {
+        csvContent = 'Employee,Position,Present Days,Short Leave,Leave Days,Actual Working Days,Performance\n';
+        attendanceReport.forEach(report => {
+          const performance = report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.9) 
+            ? "Excellent" 
+            : report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.7) 
+            ? "Good" 
+            : "Needs Improvement";
+          csvContent += `"${report.employeeName}","${report.rank}","${report.presentDays}","${report.shortLeaveDays}","${report.leaveDays}","${report.actualWorkingDays}","${performance}"\n`;
+        });
+      } else {
+        csvContent = 'Employee,Position,Monthly Salary,Daily Rate,Working Days,Calculated Salary,Status\n';
+        attendanceReport.forEach(report => {
+          csvContent += `"${report.employeeName}","${report.rank}","${formatCurrency(report.monthlySalary)}","${formatCurrency(report.dailyRate)}","${report.actualWorkingDays}/${report.totalWorkingDaysInMonth}","${formatCurrency(report.calculatedSalary)}","Calculated"\n`;
+        });
+      }
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${type}-report-${format(currentMonth, "MMMM-yyyy")}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Download completed",
+        description: `${type} report exported successfully`,
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download failed",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  }, [attendanceReport, reportStats.totalWorkingDaysThisMonth, currentMonth, toast]);
   
   if (loading) {
     return (
@@ -209,7 +271,7 @@ export default function ReportsPage() {
           <CardContent>
             <div className="flex items-center">
               <Users className="h-5 w-5 mr-2 text-blue-400" />
-              <span className="text-2xl font-bold">{totalEmployees}</span>
+              <span className="text-2xl font-bold">{reportStats.totalEmployees}</span>
             </div>
           </CardContent>
         </Card>
@@ -224,7 +286,7 @@ export default function ReportsPage() {
             <div className="flex items-center">
               <Clock className="h-5 w-5 mr-2 text-green-400" />
               <span className="text-2xl font-bold">
-                {averageAttendance.toFixed(1)} days
+                {reportStats.averageAttendance.toFixed(1)} days
               </span>
             </div>
           </CardContent>
@@ -240,7 +302,7 @@ export default function ReportsPage() {
             <div className="flex items-center">
               <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
               <span className="text-2xl font-bold">
-                {formatCurrency(totalCalculatedSalary)}
+                {formatCurrency(reportStats.totalCalculatedSalary)}
               </span>
             </div>
           </CardContent>
@@ -256,7 +318,7 @@ export default function ReportsPage() {
             <div className="flex items-center">
               <Calendar className="h-5 w-5 mr-2 text-orange-400" />
               <span className="text-2xl font-bold">
-                {totalWorkingDaysThisMonth} days
+                {reportStats.totalWorkingDaysThisMonth} days
               </span>
             </div>
           </CardContent>
@@ -279,8 +341,16 @@ export default function ReportsPage() {
           <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Monthly Attendance Report - {format(currentMonth, "MMMM yyyy")}</CardTitle>
-              <Button className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow">
-                <Download className="mr-2 h-4 w-4" />
+              <Button 
+                className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                onClick={() => handleDownload('attendance')}
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
                 Export
               </Button>
             </CardHeader>
@@ -317,15 +387,15 @@ export default function ReportsPage() {
                         <TableCell>
                           <Badge 
                             className={
-                              report.actualWorkingDays >= (totalWorkingDaysThisMonth * 0.9)
+                              report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.9)
                                 ? "bg-green-500/20 text-green-400"
-                                : report.actualWorkingDays >= (totalWorkingDaysThisMonth * 0.7)
+                                : report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.7)
                                 ? "bg-yellow-500/20 text-yellow-400"
                                 : "bg-red-500/20 text-red-400"
                             }
                           >
-                            {report.actualWorkingDays >= (totalWorkingDaysThisMonth * 0.9) ? "Excellent" 
-                             : report.actualWorkingDays >= (totalWorkingDaysThisMonth * 0.7) ? "Good" : "Needs Improvement"}
+                            {report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.9) ? "Excellent" 
+                             : report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.7) ? "Good" : "Needs Improvement"}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -341,8 +411,16 @@ export default function ReportsPage() {
           <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Salary Report Based on Attendance - {format(currentMonth, "MMMM yyyy")}</CardTitle>
-              <Button className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow">
-                <Download className="mr-2 h-4 w-4" />
+              <Button 
+                className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                onClick={() => handleDownload('salary')}
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
                 Export
               </Button>
             </CardHeader>
