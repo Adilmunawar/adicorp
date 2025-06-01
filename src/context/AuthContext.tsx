@@ -28,13 +28,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
 
   const fetchUserProfile = async (userId: string): Promise<UserProfileData | null> => {
     try {
       console.log("AuthContext - Fetching user profile for:", userId);
       
-      // First try to get existing profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -48,10 +48,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       let profile = profileData;
       
-      // If no profile exists, create one
       if (!profile) {
-        console.log("AuthContext - No profile found, creating one");
-        
+        console.log("AuthContext - Creating new profile");
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({ 
@@ -65,17 +63,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.error("AuthContext - Error creating profile:", createError);
           return null;
         }
-        
         profile = newProfile;
-        console.log("AuthContext - New profile created:", profile);
       }
       
       const profileWithCompany: UserProfileData = { ...profile };
       
-      // Fetch company data if user has a company_id
       if (profile?.company_id) {
-        console.log("AuthContext - Fetching company data for company_id:", profile.company_id);
-        
+        console.log("AuthContext - Fetching company data");
         const { data: companyData, error: companyError } = await supabase
           .from('companies')
           .select('*')
@@ -84,9 +78,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (!companyError && companyData) {
           profileWithCompany.companies = companyData;
-          console.log("AuthContext - Company data fetched:", companyData);
-        } else if (companyError) {
-          console.error("AuthContext - Error fetching company data:", companyError);
         }
       }
       
@@ -99,86 +90,82 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const refreshProfile = async (): Promise<void> => {
-    if (user?.id) {
-      console.log("AuthContext - Refreshing profile for user:", user.id);
+    if (user?.id && !loading) {
       await fetchUserProfile(user.id);
     }
   };
 
   useEffect(() => {
-    console.log("AuthContext - Setting up auth state listener");
+    let mounted = true;
     
-    // Get initial session
-    const getInitialSession = async () => {
+    const initializeAuth = async () => {
       try {
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        console.log("AuthContext - Initializing authentication");
+        
+        // Get initial session
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error("AuthContext - Error getting session:", error);
-          setLoading(false);
+          if (mounted) {
+            setLoading(false);
+            setIsInitialized(true);
+          }
           return;
         }
         
-        console.log("AuthContext - Initial session check:", currentSession ? "Session found" : "No session");
-        
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        if (currentSession?.user) {
-          console.log("AuthContext - Found existing session, fetching profile");
-          await fetchUserProfile(currentSession.user.id);
+        if (mounted) {
+          setSession(initialSession);
+          setUser(initialSession?.user ?? null);
+          
+          if (initialSession?.user) {
+            await fetchUserProfile(initialSession.user.id);
+          }
+          
+          setLoading(false);
+          setIsInitialized(true);
         }
-        
-        setLoading(false);
       } catch (error) {
-        console.error("AuthContext - Exception getting session:", error);
-        setLoading(false);
+        console.error("AuthContext - Exception during initialization:", error);
+        if (mounted) {
+          setLoading(false);
+          setIsInitialized(true);
+        }
       }
     };
 
-    getInitialSession();
-
-    // Listen for auth changes
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log("AuthContext - Auth state changed:", event, currentSession?.user?.id);
+        if (!mounted || !isInitialized) return;
+        
+        console.log("AuthContext - Auth state changed:", event);
         
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_IN' && currentSession?.user) {
-          console.log("AuthContext - User signed in, fetching profile");
           await fetchUserProfile(currentSession.user.id);
         } else if (event === 'SIGNED_OUT') {
-          console.log("AuthContext - User signed out");
           setUserProfile(null);
           sonnerToast.success('Logged out successfully');
-        }
-        
-        if (!currentSession) {
-          setLoading(false);
         }
       }
     );
 
+    initializeAuth();
+
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log("AuthContext - Attempting sign in for:", email);
       setLoading(true);
-      
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      
-      console.log("AuthContext - Sign in successful");
     } catch (error: any) {
       console.error("AuthContext - Sign in failed:", error);
       toast({
@@ -194,20 +181,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
-      console.log("AuthContext - Attempting sign up for:", email);
       setLoading(true);
-      
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: metadata
-        }
+        options: { data: metadata }
       });
-      
       if (error) throw error;
       
-      console.log("AuthContext - Sign up successful");
       toast({
         title: "Registration successful",
         description: "Please check your email to confirm your account.",
@@ -227,7 +208,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     try {
-      console.log("AuthContext - Signing out");
       setLoading(true);
       await supabase.auth.signOut();
     } catch (error: any) {

@@ -2,127 +2,151 @@
 import { useState, useEffect } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChartPie, CalendarDays, Users, FileBarChart, Download, Loader2 } from "lucide-react";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  Legend 
-} from 'recharts';
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { 
+  FileText, 
+  Download,
+  Users,
+  Clock,
+  Calendar,
+  TrendingUp,
+  Loader2
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeRow } from "@/types/supabase";
+import { formatCurrency } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth } from "date-fns";
+
+interface AttendanceReport {
+  employeeId: string;
+  employeeName: string;
+  rank: string;
+  wageRate: number;
+  presentDays: number;
+  shortLeaveDays: number;
+  leaveDays: number;
+  totalWorkingDays: number;
+  totalSalary: number;
+}
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState("attendance");
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
+  const [attendanceReport, setAttendanceReport] = useState<AttendanceReport[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, session } = useAuth();
+  const [currentMonth] = useState(new Date());
+  const { userProfile } = useAuth();
   const { toast } = useToast();
   
-  // Data states
-  const [attendanceData, setAttendanceData] = useState([
-    { month: 'Jan', present: 85, absent: 15 },
-    { month: 'Feb', present: 88, absent: 12 },
-    { month: 'Mar', present: 90, absent: 10 },
-    { month: 'Apr', present: 87, absent: 13 },
-    { month: 'May', present: 89, absent: 11 },
-    { month: 'Jun', present: 92, absent: 8 },
-  ]);
-  
-  const [expensesData, setExpensesData] = useState([
-    { month: 'Jan', amount: 125000 },
-    { month: 'Feb', amount: 130000 },
-    { month: 'Mar', amount: 132000 },
-    { month: 'Apr', amount: 129000 },
-    { month: 'May', amount: 135000 },
-    { month: 'Jun', amount: 142000 },
-  ]);
-
   useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchReportsData = async () => {
       try {
-        setLoading(true);
-        
-        // Only fetch if we have an authenticated session
-        if (!session || !user) {
-          console.log("No active session, skipping employee fetch");
-          setEmployees([]);
+        if (!userProfile?.company_id) {
           setLoading(false);
           return;
         }
         
-        // Get user's company_id
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('id', user.id)
-          .single();
-          
-        if (userError) {
-          console.error("Error fetching profile:", userError);
-          throw userError;
-        }
+        setLoading(true);
+        console.log("Reports - Fetching data for company:", userProfile.company_id);
         
-        if (!userData?.company_id) {
-          throw new Error("Company ID not found.");
-        }
-
-        const { data, error } = await supabase
+        // Fetch employees
+        const { data: employeeData, error: employeeError } = await supabase
           .from('employees')
           .select('*')
-          .eq('company_id', userData.company_id);
+          .eq('company_id', userProfile.company_id)
+          .eq('status', 'active')
+          .order('name');
           
-        if (error) {
-          console.error("Error fetching employees:", error);
-          throw error;
-        }
+        if (employeeError) throw employeeError;
         
-        console.log("Fetched employees:", data?.length || 0);
-        setEmployees(data || []);
+        setEmployees(employeeData || []);
         
-        // Calculate expenses data
-        if (data && data.length > 0) {
-          // Calculate the total salary expense per month
-          const daysInMonth = new Date(
-            new Date().getFullYear(),
-            new Date().getMonth() + 1,
-            0
-          ).getDate();
+        if (employeeData && employeeData.length > 0) {
+          // Fetch attendance for current month
+          const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+          const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
           
-          const totalMonthlySalary = data.reduce((acc, employee) => {
-            return acc + (Number(employee.wage_rate) * daysInMonth);
-          }, 0);
+          const employeeIds = employeeData.map(emp => emp.id);
           
-          // Create new expenses data with monthly variation
-          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-          const newExpensesData = months.map((month, index) => {
-            // Add some variance to make chart interesting
-            const variance = 0.85 + (Math.random() * 0.3); // Between 85% and 115%
+          const { data: attendanceData, error: attendanceError } = await supabase
+            .from('attendance')
+            .select('*')
+            .in('employee_id', employeeIds)
+            .gte('date', monthStart)
+            .lte('date', monthEnd);
+            
+          if (attendanceError && attendanceError.code !== 'PGRST116') {
+            throw attendanceError;
+          }
+          
+          // Process attendance report
+          const attendanceMap = new Map();
+          (attendanceData || []).forEach(record => {
+            const key = record.employee_id;
+            if (!attendanceMap.has(key)) {
+              attendanceMap.set(key, {
+                present: 0,
+                shortLeave: 0,
+                leave: 0
+              });
+            }
+            
+            const stats = attendanceMap.get(key);
+            switch (record.status) {
+              case 'present':
+                stats.present++;
+                break;
+              case 'short_leave':
+                stats.shortLeave++;
+                break;
+              case 'leave':
+                stats.leave++;
+                break;
+            }
+          });
+          
+          const reportData: AttendanceReport[] = employeeData.map(employee => {
+            const attendance = attendanceMap.get(employee.id) || {
+              present: 0,
+              shortLeave: 0,
+              leave: 0
+            };
+            
+            const totalWorkingDays = attendance.present + (attendance.shortLeave * 0.5);
+            const totalSalary = Number(employee.wage_rate) * totalWorkingDays;
+            
             return {
-              month,
-              amount: Math.round(totalMonthlySalary * variance)
+              employeeId: employee.id,
+              employeeName: employee.name,
+              rank: employee.rank,
+              wageRate: Number(employee.wage_rate),
+              presentDays: attendance.present,
+              shortLeaveDays: attendance.shortLeave,
+              leaveDays: attendance.leave,
+              totalWorkingDays,
+              totalSalary
             };
           });
           
-          setExpensesData(newExpensesData);
+          setAttendanceReport(reportData);
+          console.log("Reports - Processed attendance report:", reportData.length);
         }
         
       } catch (error) {
-        console.error("Error fetching employee data:", error);
+        console.error("Reports - Error loading data:", error);
         toast({
-          title: "Failed to load report data",
+          title: "Failed to load reports data",
           description: "Please refresh and try again.",
           variant: "destructive",
         });
@@ -130,206 +154,231 @@ export default function ReportsPage() {
         setLoading(false);
       }
     };
-
-    fetchEmployees();
-  }, [toast, session, user]);
+    
+    fetchReportsData();
+  }, [userProfile?.company_id, currentMonth, toast]);
   
-  // Calculate employee status distribution
-  const employeeData = [
-    { name: 'Active', value: employees.filter(e => e.status === 'active').length, color: '#6d28d9' },
-    { name: 'On Leave', value: 0, color: '#2563eb' },
-    { name: 'Inactive', value: employees.filter(e => e.status === 'inactive').length, color: '#dc2626' },
-  ];
+  const totalSalary = attendanceReport.reduce((sum, report) => sum + report.totalSalary, 0);
+  const totalEmployees = attendanceReport.length;
+  const averageAttendance = totalEmployees > 0 
+    ? attendanceReport.reduce((sum, report) => sum + report.totalWorkingDays, 0) / totalEmployees
+    : 0;
+  
+  if (loading) {
+    return (
+      <Dashboard title="Reports">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-adicorp-purple mx-auto" />
+            <p className="mt-4 text-white/60">Loading reports...</p>
+          </div>
+        </div>
+      </Dashboard>
+    );
+  }
 
-  // Only show employee data points that have values
-  const filteredEmployeeData = employeeData.filter(item => item.value > 0);
+  if (!userProfile?.company_id) {
+    return (
+      <Dashboard title="Reports">
+        <div className="text-center py-8">
+          <p className="text-white/70">Please complete company setup to view reports.</p>
+        </div>
+      </Dashboard>
+    );
+  }
   
   return (
-    <Dashboard title="Analytics & Reports">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">Reports for {format(new Date(), "MMMM yyyy")}</h2>
-        <Button 
-          className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Export Reports
-        </Button>
+    <Dashboard title="Reports">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-white/60">
+              Total Employees
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Users className="h-5 w-5 mr-2 text-blue-400" />
+              <span className="text-2xl font-bold">{totalEmployees}</span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-white/60">
+              Average Attendance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Clock className="h-5 w-5 mr-2 text-green-400" />
+              <span className="text-2xl font-bold">
+                {averageAttendance.toFixed(1)} days
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-white/60">
+              Monthly Salary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
+              <span className="text-2xl font-bold">
+                {formatCurrency(totalSalary)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-white/60">
+              Report Period
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Calendar className="h-5 w-5 mr-2 text-orange-400" />
+              <span className="text-lg font-bold">
+                {format(currentMonth, "MMM yyyy")}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
       
-      <Tabs defaultValue="attendance" className="space-y-4" onValueChange={setActiveTab}>
-        <TabsList className="glass-card bg-adicorp-dark-light/60 grid grid-cols-3 mb-4">
-          <TabsTrigger value="attendance" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
-            <CalendarDays className="h-4 w-4 mr-2" />
-            Attendance
+      <Tabs defaultValue="attendance-report" className="space-y-4">
+        <TabsList className="glass-card bg-adicorp-dark-light/60 grid grid-cols-2 mb-4">
+          <TabsTrigger value="attendance-report" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
+            <FileText className="h-4 w-4 mr-2" />
+            Attendance Report
           </TabsTrigger>
-          <TabsTrigger value="employees" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
-            <Users className="h-4 w-4 mr-2" />
-            Employees
-          </TabsTrigger>
-          <TabsTrigger value="expenses" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
-            <FileBarChart className="h-4 w-4 mr-2" />
-            Expenses
+          <TabsTrigger value="salary-report" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
+            <Download className="h-4 w-4 mr-2" />
+            Salary Report
           </TabsTrigger>
         </TabsList>
         
-        {loading ? (
-          <div className="flex justify-center items-center py-16">
-            <Loader2 className="h-12 w-12 animate-spin text-adicorp-purple" />
-          </div>
-        ) : (
-          <>
-            <TabsContent value="attendance">
-              <Card className="glass-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <CalendarDays className="h-5 w-5 mr-2 text-adicorp-purple" />
-                    Attendance Overview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[400px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={attendanceData}
-                        margin={{
-                          top: 20,
-                          right: 30,
-                          left: 20,
-                          bottom: 5,
-                        }}
+        <TabsContent value="attendance-report">
+          <Card className="glass-card">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Monthly Attendance Report - {format(currentMonth, "MMMM yyyy")}</CardTitle>
+              <Button className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {attendanceReport.length === 0 ? (
+                <div className="text-center py-8 text-white/70">
+                  <p>No attendance data found for this month.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/10 hover:bg-transparent">
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead>Present Days</TableHead>
+                      <TableHead>Short Leave</TableHead>
+                      <TableHead>Leave Days</TableHead>
+                      <TableHead>Working Days</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attendanceReport.map((report) => (
+                      <TableRow 
+                        key={report.employeeId} 
+                        className="border-white/10 hover:bg-adicorp-dark/30"
                       >
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="month" stroke="rgba(255,255,255,0.7)" />
-                        <YAxis stroke="rgba(255,255,255,0.7)" />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: '#1e1e2d', 
-                            borderColor: 'rgba(255,255,255,0.1)',
-                            color: '#fff'
-                          }}
-                        />
-                        <Legend />
-                        <Bar dataKey="present" fill="#6d28d9" name="Present %" />
-                        <Bar dataKey="absent" fill="#dc2626" name="Absent %" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="employees">
-              <Card className="glass-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Users className="h-5 w-5 mr-2 text-adicorp-purple" />
-                    Employee Status Distribution
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {employees.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12">
-                      <p className="text-white/70 mb-4">No employee data available</p>
-                      <Button 
-                        variant="outline" 
-                        className="border-white/10"
-                        onClick={() => window.location.href = "/employees"}
-                      >
-                        <Users className="mr-2 h-4 w-4" />
-                        Add Employees
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="h-[400px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={filteredEmployeeData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={150}
-                            fill="#8884d8"
-                            dataKey="value"
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        <TableCell className="font-medium">{report.employeeName}</TableCell>
+                        <TableCell>{report.rank}</TableCell>
+                        <TableCell>{report.presentDays}</TableCell>
+                        <TableCell>{report.shortLeaveDays}</TableCell>
+                        <TableCell>{report.leaveDays}</TableCell>
+                        <TableCell className="font-bold">{report.totalWorkingDays}</TableCell>
+                        <TableCell>
+                          <Badge 
+                            className={
+                              report.totalWorkingDays >= 20 
+                                ? "bg-green-500/20 text-green-400"
+                                : report.totalWorkingDays >= 15
+                                ? "bg-yellow-500/20 text-yellow-400"
+                                : "bg-red-500/20 text-red-400"
+                            }
                           >
-                            {filteredEmployeeData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Legend />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: '#1e1e2d', 
-                              borderColor: 'rgba(255,255,255,0.1)',
-                              color: '#fff'
-                            }}
-                            formatter={(value) => [`${value} employees`, '']}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="expenses">
-              <Card className="glass-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <FileBarChart className="h-5 w-5 mr-2 text-adicorp-purple" />
-                    Monthly Salary Expenses
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {employees.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12">
-                      <p className="text-white/70 mb-4">No expense data available</p>
-                      <Button 
-                        variant="outline" 
-                        className="border-white/10"
-                        onClick={() => window.location.href = "/employees"}
+                            {report.totalWorkingDays >= 20 ? "Excellent" 
+                             : report.totalWorkingDays >= 15 ? "Good" : "Needs Improvement"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="salary-report">
+          <Card className="glass-card">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Salary Report Based on Attendance - {format(currentMonth, "MMMM yyyy")}</CardTitle>
+              <Button className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {attendanceReport.length === 0 ? (
+                <div className="text-center py-8 text-white/70">
+                  <p>No salary data found for this month.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/10 hover:bg-transparent">
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead>Daily Rate</TableHead>
+                      <TableHead>Working Days</TableHead>
+                      <TableHead>Total Salary</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attendanceReport.map((report) => (
+                      <TableRow 
+                        key={report.employeeId} 
+                        className="border-white/10 hover:bg-adicorp-dark/30"
                       >
-                        <Users className="mr-2 h-4 w-4" />
-                        Add Employees
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="h-[400px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={expensesData}
-                          margin={{
-                            top: 20,
-                            right: 30,
-                            left: 20,
-                            bottom: 5,
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                          <XAxis dataKey="month" stroke="rgba(255,255,255,0.7)" />
-                          <YAxis stroke="rgba(255,255,255,0.7)" 
-                            tickFormatter={(value) => `PKR ${value.toLocaleString()}`} 
-                          />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: '#1e1e2d', 
-                              borderColor: 'rgba(255,255,255,0.1)',
-                              color: '#fff'
-                            }}
-                            formatter={(value) => [`PKR ${value.toLocaleString()}`, 'Expenses']}
-                          />
-                          <Bar dataKey="amount" fill="#2563eb" name="Salary Expenses" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </>
-        )}
+                        <TableCell className="font-medium">{report.employeeName}</TableCell>
+                        <TableCell>{report.rank}</TableCell>
+                        <TableCell>{formatCurrency(report.wageRate)}</TableCell>
+                        <TableCell>{report.totalWorkingDays}</TableCell>
+                        <TableCell className="font-bold text-green-400">
+                          {formatCurrency(report.totalSalary)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-blue-500/20 text-blue-400">
+                            Calculated
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </Dashboard>
   );
