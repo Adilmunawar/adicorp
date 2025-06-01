@@ -31,10 +31,9 @@ import { Input } from "@/components/ui/input";
 interface EmployeeFormProps {
   isOpen: boolean;
   onClose: () => void;
-  employeeId?: string; // If provided, we're editing an existing employee
+  employeeId?: string;
 }
 
-// Available ranks
 const ranks = [
   "Data Entry Operator",
   "Customer Service",
@@ -48,11 +47,11 @@ const ranks = [
   "Executive"
 ];
 
-// Form validation schema
+// Updated schema for monthly salary
 const employeeSchema = z.object({
   name: z.string().min(1, { message: "Name is required" }),
   rank: z.string().min(1, { message: "Rank is required" }),
-  wage_rate: z.coerce.number().min(0.01, { message: "Wage rate must be greater than 0" }),
+  monthly_salary: z.coerce.number().min(1, { message: "Monthly salary must be greater than 0" }),
   status: z.enum(["active", "inactive"])
 });
 
@@ -65,39 +64,34 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   const [isFetching, setIsFetching] = useState(false);
   const { user, session, userProfile } = useAuth();
   
-  // Initialize the form
   const form = useForm<FormValues>({
     resolver: zodResolver(employeeSchema),
     defaultValues: {
       name: "",
       rank: "",
-      wage_rate: 0,
+      monthly_salary: 0,
       status: "active"
     }
   });
 
-  // Check if company is set up
   const hasCompany = !!userProfile?.company_id;
   
   useEffect(() => {
-    // Reset form when dialog opens/closes
     if (!isOpen) {
       form.reset({
         name: "",
         rank: "",
-        wage_rate: 0,
+        monthly_salary: 0,
         status: "active"
       });
       return;
     }
     
-    // Fetch employee data if editing
     if (isOpen && isEditing && employeeId) {
       const fetchEmployee = async () => {
         try {
           setIsFetching(true);
 
-          // Check for session first
           if (!session || !user) {
             toast({
               title: "Authentication required",
@@ -123,7 +117,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             form.reset({
               name: data.name,
               rank: data.rank,
-              wage_rate: Number(data.wage_rate),
+              monthly_salary: Number(data.wage_rate), // Convert existing wage_rate to monthly_salary
               status: data.status as "active" | "inactive"
             });
           }
@@ -148,7 +142,6 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
     try {
       setIsLoading(true);
       
-      // Verify we have an active session
       if (!session || !user) {
         toast({
           title: "Authentication required",
@@ -158,7 +151,6 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         return;
       }
       
-      // Check if we have a company ID
       if (!userProfile?.company_id) {
         toast({
           title: "Company ID not found",
@@ -171,14 +163,13 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       console.log("Submitting employee form with company_id:", userProfile.company_id);
       
       if (isEditing && employeeId) {
-        // Update existing employee
         console.log("Updating employee:", employeeId);
         const { error } = await supabase
           .from('employees')
           .update({
             name: values.name,
             rank: values.rank,
-            wage_rate: values.wage_rate,
+            wage_rate: values.monthly_salary, // Store monthly salary in wage_rate field
             status: values.status
           })
           .eq('id', employeeId);
@@ -192,14 +183,13 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           description: "Employee information has been updated successfully."
         });
       } else {
-        // Create new employee
         console.log("Creating new employee with company_id:", userProfile.company_id);
         const { error } = await supabase
           .from('employees')
           .insert({
             name: values.name,
             rank: values.rank,
-            wage_rate: values.wage_rate,
+            wage_rate: values.monthly_salary, // Store monthly salary in wage_rate field
             status: values.status,
             company_id: userProfile.company_id
           });
@@ -329,16 +319,16 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             
             <FormField
               control={form.control}
-              name="wage_rate"
+              name="monthly_salary"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Daily Wage Rate (PKR)</FormLabel>
+                  <FormLabel>Monthly Salary (PKR)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
                       {...field}
                       className="bg-adicorp-dark/60 border-white/10"
-                      placeholder="e.g. 1500"
+                      placeholder="e.g. 45000"
                     />
                   </FormControl>
                   <FormMessage />

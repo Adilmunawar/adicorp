@@ -24,21 +24,23 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeRow } from "@/types/supabase";
-import { formatCurrency } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonth } from "@/utils/salaryCalculations";
 
 interface AttendanceReport {
   employeeId: string;
   employeeName: string;
   rank: string;
-  wageRate: number;
+  monthlySalary: number;
   presentDays: number;
   shortLeaveDays: number;
   leaveDays: number;
-  totalWorkingDays: number;
-  totalSalary: number;
+  totalWorkingDaysInMonth: number;
+  actualWorkingDays: number;
+  dailyRate: number;
+  calculatedSalary: number;
 }
 
 export default function ReportsPage() {
@@ -90,7 +92,7 @@ export default function ReportsPage() {
             throw attendanceError;
           }
           
-          // Process attendance report
+          // Process attendance report with proper salary calculations
           const attendanceMap = new Map();
           (attendanceData || []).forEach(record => {
             const key = record.employee_id;
@@ -123,19 +125,26 @@ export default function ReportsPage() {
               leave: 0
             };
             
-            const totalWorkingDays = attendance.present + (attendance.shortLeave * 0.5);
-            const totalSalary = Number(employee.wage_rate) * totalWorkingDays;
+            const monthlySalary = Number(employee.wage_rate); // wage_rate now stores monthly salary
+            const salaryCalc = calculateEmployeeSalary(
+              monthlySalary,
+              attendance.present,
+              attendance.shortLeave,
+              currentMonth
+            );
             
             return {
               employeeId: employee.id,
               employeeName: employee.name,
               rank: employee.rank,
-              wageRate: Number(employee.wage_rate),
+              monthlySalary,
               presentDays: attendance.present,
               shortLeaveDays: attendance.shortLeave,
               leaveDays: attendance.leave,
-              totalWorkingDays,
-              totalSalary
+              totalWorkingDaysInMonth: salaryCalc.totalWorkingDays,
+              actualWorkingDays: salaryCalc.actualWorkingDays,
+              dailyRate: salaryCalc.dailyRate,
+              calculatedSalary: salaryCalc.calculatedSalary
             };
           });
           
@@ -158,11 +167,12 @@ export default function ReportsPage() {
     fetchReportsData();
   }, [userProfile?.company_id, currentMonth, toast]);
   
-  const totalSalary = attendanceReport.reduce((sum, report) => sum + report.totalSalary, 0);
+  const totalCalculatedSalary = attendanceReport.reduce((sum, report) => sum + report.calculatedSalary, 0);
   const totalEmployees = attendanceReport.length;
   const averageAttendance = totalEmployees > 0 
-    ? attendanceReport.reduce((sum, report) => sum + report.totalWorkingDays, 0) / totalEmployees
+    ? attendanceReport.reduce((sum, report) => sum + report.actualWorkingDays, 0) / totalEmployees
     : 0;
+  const totalWorkingDaysThisMonth = getWorkingDaysInMonth(currentMonth);
   
   if (loading) {
     return (
@@ -223,14 +233,14 @@ export default function ReportsPage() {
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white/60">
-              Monthly Salary
+              Total Calculated Salary
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
               <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
               <span className="text-2xl font-bold">
-                {formatCurrency(totalSalary)}
+                {formatCurrency(totalCalculatedSalary)}
               </span>
             </div>
           </CardContent>
@@ -239,14 +249,14 @@ export default function ReportsPage() {
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white/60">
-              Report Period
+              Working Days This Month
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
               <Calendar className="h-5 w-5 mr-2 text-orange-400" />
-              <span className="text-lg font-bold">
-                {format(currentMonth, "MMM yyyy")}
+              <span className="text-2xl font-bold">
+                {totalWorkingDaysThisMonth} days
               </span>
             </div>
           </CardContent>
@@ -288,8 +298,8 @@ export default function ReportsPage() {
                       <TableHead>Present Days</TableHead>
                       <TableHead>Short Leave</TableHead>
                       <TableHead>Leave Days</TableHead>
-                      <TableHead>Working Days</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Actual Working Days</TableHead>
+                      <TableHead>Performance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -303,19 +313,19 @@ export default function ReportsPage() {
                         <TableCell>{report.presentDays}</TableCell>
                         <TableCell>{report.shortLeaveDays}</TableCell>
                         <TableCell>{report.leaveDays}</TableCell>
-                        <TableCell className="font-bold">{report.totalWorkingDays}</TableCell>
+                        <TableCell className="font-bold">{report.actualWorkingDays}</TableCell>
                         <TableCell>
                           <Badge 
                             className={
-                              report.totalWorkingDays >= 20 
+                              report.actualWorkingDays >= (totalWorkingDaysThisMonth * 0.9)
                                 ? "bg-green-500/20 text-green-400"
-                                : report.totalWorkingDays >= 15
+                                : report.actualWorkingDays >= (totalWorkingDaysThisMonth * 0.7)
                                 ? "bg-yellow-500/20 text-yellow-400"
                                 : "bg-red-500/20 text-red-400"
                             }
                           >
-                            {report.totalWorkingDays >= 20 ? "Excellent" 
-                             : report.totalWorkingDays >= 15 ? "Good" : "Needs Improvement"}
+                            {report.actualWorkingDays >= (totalWorkingDaysThisMonth * 0.9) ? "Excellent" 
+                             : report.actualWorkingDays >= (totalWorkingDaysThisMonth * 0.7) ? "Good" : "Needs Improvement"}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -347,9 +357,10 @@ export default function ReportsPage() {
                     <TableRow className="border-white/10 hover:bg-transparent">
                       <TableHead>Employee</TableHead>
                       <TableHead>Position</TableHead>
+                      <TableHead>Monthly Salary</TableHead>
                       <TableHead>Daily Rate</TableHead>
                       <TableHead>Working Days</TableHead>
-                      <TableHead>Total Salary</TableHead>
+                      <TableHead>Calculated Salary</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -361,10 +372,11 @@ export default function ReportsPage() {
                       >
                         <TableCell className="font-medium">{report.employeeName}</TableCell>
                         <TableCell>{report.rank}</TableCell>
-                        <TableCell>{formatCurrency(report.wageRate)}</TableCell>
-                        <TableCell>{report.totalWorkingDays}</TableCell>
+                        <TableCell>{formatCurrency(report.monthlySalary)}</TableCell>
+                        <TableCell>{formatCurrency(report.dailyRate)}</TableCell>
+                        <TableCell>{report.actualWorkingDays} / {report.totalWorkingDaysInMonth}</TableCell>
                         <TableCell className="font-bold text-green-400">
-                          {formatCurrency(report.totalSalary)}
+                          {formatCurrency(report.calculatedSalary)}
                         </TableCell>
                         <TableCell>
                           <Badge className="bg-blue-500/20 text-blue-400">

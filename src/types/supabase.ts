@@ -25,7 +25,7 @@ export type AttendanceUpdate = Database['public']['Tables']['attendance']['Updat
 export type AttendanceStatus = 'present' | 'short_leave' | 'leave';
 export type EmployeeStatus = 'active' | 'inactive';
 
-// Currency formatting helper
+// Currency formatting helper (moved to salaryCalculations.ts for consistency)
 export const formatCurrency = (amount: number): string => {
-  return `PKR ${amount.toLocaleString('en-PK')}`;
+  return `PKR ${Math.round(amount).toLocaleString('en-PK')}`;
 };
