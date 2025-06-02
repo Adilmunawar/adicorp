@@ -18,6 +18,18 @@ export default function Auth() {
     }
   }, [user, loading, navigate, from]);
 
+  // Show loading while checking auth state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-adicorp-dark">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-adicorp-purple border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-white/60">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show auth form only if not logged in
   return !user ? <AuthForm /> : null;
 }

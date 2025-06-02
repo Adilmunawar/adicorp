@@ -134,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
         if (!mounted) return;
         
         console.log("AuthContext - Auth state changed:", event);
@@ -143,21 +143,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_IN' && currentSession?.user) {
-          await fetchUserProfile(currentSession.user.id);
-          sonnerToast.success('Successfully logged in!', {
-            description: 'Welcome back to AdiCorp Management'
-          });
-          // Redirect to dashboard after successful login
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 500);
+          // Defer async operations
+          setTimeout(async () => {
+            await fetchUserProfile(currentSession.user.id);
+            sonnerToast.success('Successfully logged in!', {
+              description: 'Welcome back to AdiCorp Management'
+            });
+          }, 0);
         } else if (event === 'SIGNED_OUT') {
           setUserProfile(null);
           sonnerToast.success('Logged out successfully');
-          // Redirect to home page after logout
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 500);
+        }
+        
+        // Update loading state after auth state change
+        if (mounted && isInitialized) {
+          setLoading(false);
         }
       }
     );
@@ -184,9 +184,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: error.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
-      throw error;
-    } finally {
       setLoading(false);
+      throw error;
     }
   };
 
@@ -221,7 +220,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       console.log("AuthContext - Attempting sign out");
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       console.log("AuthContext - Sign out successful");
     } catch (error: any) {
       console.error("AuthContext - Sign out failed:", error);
