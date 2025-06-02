@@ -13,6 +13,7 @@ export default function Auth() {
   useEffect(() => {
     // If user is already logged in, redirect to dashboard or the page they came from
     if (user && !loading) {
+      console.log("Auth - User already logged in, redirecting to:", from);
       navigate(from, { replace: true });
     }
   }, [user, loading, navigate, from]);

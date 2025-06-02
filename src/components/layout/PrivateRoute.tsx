@@ -11,7 +11,7 @@ export const PrivateRoute = () => {
 
   useEffect(() => {
     if (!loading && !user) {
-      console.log("PrivateRoute - No authenticated user, showing toast");
+      console.log("PrivateRoute - No authenticated user, redirecting to auth");
       toast.error("Authentication required", {
         description: "Please log in to access this page"
       });

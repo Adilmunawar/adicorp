@@ -135,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        if (!mounted || !isInitialized) return;
+        if (!mounted) return;
         
         console.log("AuthContext - Auth state changed:", event);
         
@@ -143,13 +143,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_IN' && currentSession?.user) {
+          await fetchUserProfile(currentSession.user.id);
           sonnerToast.success('Successfully logged in!', {
             description: 'Welcome back to AdiCorp Management'
           });
-          await fetchUserProfile(currentSession.user.id);
+          // Redirect to dashboard after successful login
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 500);
         } else if (event === 'SIGNED_OUT') {
           setUserProfile(null);
           sonnerToast.success('Logged out successfully');
+          // Redirect to home page after logout
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 500);
         }
       }
     );
@@ -165,8 +173,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
+      console.log("AuthContext - Attempting sign in");
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      console.log("AuthContext - Sign in successful");
     } catch (error: any) {
       console.error("AuthContext - Sign in failed:", error);
       toast({
@@ -210,7 +220,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     try {
       setLoading(true);
+      console.log("AuthContext - Attempting sign out");
       await supabase.auth.signOut();
+      console.log("AuthContext - Sign out successful");
     } catch (error: any) {
       console.error("AuthContext - Sign out failed:", error);
       toast({
