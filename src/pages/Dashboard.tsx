@@ -38,6 +38,7 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { userProfile } = useAuth();
   const { toast } = useToast();
   
@@ -66,51 +67,64 @@ export default function DashboardPage() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
+      setError(null);
+      
       if (!userProfile?.company_id) {
+        console.log("Dashboard - No company ID, skipping fetch");
         setLoading(false);
         return;
       }
 
       console.log("Dashboard - Fetching data for company:", userProfile.company_id);
       
-      // Fetch all data in parallel for better performance
+      // Optimize queries by running them in parallel and using more specific selects
       const [employeesResult, todayAttendanceResult, monthAttendanceResult] = await Promise.all([
         supabase
           .from('employees')
-          .select('*')
+          .select('id, name, wage_rate, status')
           .eq('company_id', userProfile.company_id)
           .eq('status', 'active'),
         supabase
           .from('attendance')
-          .select('*')
+          .select('employee_id, status')
           .eq('date', today),
         supabase
           .from('attendance')
-          .select('*')
+          .select('employee_id, status, date')
           .gte('date', monthStart)
           .lte('date', monthEnd)
       ]);
 
       if (employeesResult.error) {
         console.error("Dashboard - Error fetching employees:", employeesResult.error);
-        throw employeesResult.error;
+        throw new Error(`Failed to fetch employees: ${employeesResult.error.message}`);
+      }
+
+      if (todayAttendanceResult.error) {
+        console.error("Dashboard - Error fetching today's attendance:", todayAttendanceResult.error);
+        throw new Error(`Failed to fetch today's attendance: ${todayAttendanceResult.error.message}`);
+      }
+
+      if (monthAttendanceResult.error) {
+        console.error("Dashboard - Error fetching month attendance:", monthAttendanceResult.error);
+        throw new Error(`Failed to fetch month attendance: ${monthAttendanceResult.error.message}`);
       }
 
       const employees = employeesResult.data || [];
-      const employeeIds = employees.map(emp => emp.id);
+      const employeeIds = new Set(employees.map(emp => emp.id));
       
       // Filter attendance data for current company employees only
       const todayAttendance = (todayAttendanceResult.data || [])
-        .filter(att => employeeIds.includes(att.employee_id));
+        .filter(att => employeeIds.has(att.employee_id));
       const monthAttendance = (monthAttendanceResult.data || [])
-        .filter(att => employeeIds.includes(att.employee_id));
+        .filter(att => employeeIds.has(att.employee_id));
 
       // Calculate monthly expenses based on actual attendance
       const monthlyExpectedExpenses = employees.reduce((total, emp) => {
-        return total + Number(emp.wage_rate); // Monthly salary
+        return total + Number(emp.wage_rate);
       }, 0);
 
-      // Calculate actual expenses based on attendance
+      // Calculate actual expenses based on attendance - optimized
       const attendanceMap = new Map();
       monthAttendance.forEach(record => {
         const key = record.employee_id;
@@ -144,31 +158,36 @@ export default function DashboardPage() {
         return total + salaryCalc.calculatedSalary;
       }, 0);
 
-      // Calculate average attendance
-      const totalPossibleAttendance = employees.length * getWorkingDaysInMonth(currentMonth);
-      const actualAttendance = monthAttendance.filter(att => att.status === 'present').length + 
-                             (monthAttendance.filter(att => att.status === 'short_leave').length * 0.5);
+      // Calculate average attendance - optimized
+      const workingDaysThisMonth = getWorkingDaysInMonth(currentMonth);
+      const totalPossibleAttendance = employees.length * workingDaysThisMonth;
+      const presentCount = monthAttendance.filter(att => att.status === 'present').length;
+      const shortLeaveCount = monthAttendance.filter(att => att.status === 'short_leave').length;
+      const actualAttendance = presentCount + (shortLeaveCount * 0.5);
       const averageAttendance = totalPossibleAttendance > 0 
         ? (actualAttendance / totalPossibleAttendance) * 100
         : 0;
 
+      const todayPresentCount = todayAttendance.filter(att => att.status === 'present').length;
+
       const newStats: DashboardStats = {
         totalEmployees: employees.length,
-        totalAttendanceToday: todayAttendance.filter(att => att.status === 'present').length,
+        totalAttendanceToday: todayPresentCount,
         monthlyExpectedExpenses,
         actualMonthlyExpenses,
         averageAttendance,
-        workingDaysThisMonth: getWorkingDaysInMonth(currentMonth)
+        workingDaysThisMonth
       };
 
       setStats(newStats);
-      console.log("Dashboard - Stats calculated:", newStats);
+      console.log("Dashboard - Stats calculated successfully:", newStats);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Dashboard - Error fetching data:", error);
+      setError(error.message || "Failed to load dashboard data");
       toast({
         title: "Failed to load dashboard data",
-        description: "Please refresh and try again.",
+        description: error.message || "Please refresh and try again.",
         variant: "destructive",
       });
     } finally {
@@ -178,8 +197,12 @@ export default function DashboardPage() {
   }, [userProfile?.company_id, today, monthStart, monthEnd, currentMonth, toast]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    if (userProfile?.company_id) {
+      fetchDashboardData();
+    } else {
+      setLoading(false);
+    }
+  }, [fetchDashboardData, userProfile?.company_id]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -199,11 +222,30 @@ export default function DashboardPage() {
     );
   }
 
+  if (error) {
+    return (
+      <Dashboard title="Dashboard">
+        <div className="text-center py-8">
+          <p className="text-red-400 mb-4">{error}</p>
+          <Button onClick={handleRefresh} className="bg-adicorp-purple hover:bg-adicorp-purple-dark">
+            Retry
+          </Button>
+        </div>
+      </Dashboard>
+    );
+  }
+
   if (!userProfile?.company_id) {
     return (
       <Dashboard title="Dashboard">
         <div className="text-center py-8">
           <p className="text-white/70">Please complete company setup to view dashboard.</p>
+          <Button 
+            onClick={() => window.location.href = '/settings'}
+            className="mt-4 bg-adicorp-purple hover:bg-adicorp-purple-dark"
+          >
+            Go to Settings
+          </Button>
         </div>
       </Dashboard>
     );

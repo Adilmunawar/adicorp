@@ -106,7 +106,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             .from('employees')
             .select('*')
             .eq('id', employeeId)
-            .eq('company_id', userProfile?.company_id) // Filter by company
+            .eq('company_id', userProfile?.company_id)
             .single();
             
           if (error) {
@@ -174,7 +174,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             status: values.status
           })
           .eq('id', employeeId)
-          .eq('company_id', userProfile.company_id); // Ensure company ownership
+          .eq('company_id', userProfile.company_id);
           
         if (error) {
           console.error("Error updating employee:", error);
@@ -261,7 +261,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 will-change-auto">
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-[50%] left-[50%] transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Employee" : "Add New Employee"}
@@ -301,14 +301,14 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
                   <FormLabel>Rank/Position</FormLabel>
                   <Select 
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
                         <SelectValue placeholder="Select a position" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="bg-adicorp-dark-light border-white/10">
+                    <SelectContent className="bg-adicorp-dark-light border-white/10 z-[60]">
                       {ranks.map((rank) => (
                         <SelectItem key={rank} value={rank}>{rank}</SelectItem>
                       ))}
@@ -346,14 +346,14 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
                   <FormLabel>Status</FormLabel>
                   <Select 
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="bg-adicorp-dark-light border-white/10">
+                    <SelectContent className="bg-adicorp-dark-light border-white/10 z-[60]">
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
