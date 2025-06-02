@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const { toast } = useToast();
 
   const fetchUserProfile = async (userId: string): Promise<UserProfileData | null> => {
@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const profileWithCompany: UserProfileData = { ...profile };
       
       if (profile?.company_id) {
-        console.log("AuthContext - Fetching company data");
+        console.log("AuthContext - Fetching company data for company_id:", profile.company_id);
         const { data: companyData, error: companyError } = await supabase
           .from('companies')
           .select('*')
@@ -81,6 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
+      console.log("AuthContext - Profile loaded:", profileWithCompany);
       setUserProfile(profileWithCompany);
       return profileWithCompany;
     } catch (error) {
@@ -102,71 +103,73 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         console.log("AuthContext - Initializing authentication");
         
+        // Set up auth state listener first
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, currentSession) => {
+            if (!mounted) return;
+            
+            console.log("AuthContext - Auth state changed:", event, currentSession?.user?.id);
+            
+            if (event === 'SIGNED_IN' && currentSession?.user) {
+              setSession(currentSession);
+              setUser(currentSession.user);
+              // Fetch profile after setting user
+              setTimeout(async () => {
+                if (mounted) {
+                  await fetchUserProfile(currentSession.user.id);
+                  setLoading(false);
+                  sonnerToast.success('Successfully logged in!', {
+                    description: 'Welcome back to AdiCorp Management'
+                  });
+                }
+              }, 100);
+            } else if (event === 'SIGNED_OUT') {
+              setSession(null);
+              setUser(null);
+              setUserProfile(null);
+              setLoading(false);
+              sonnerToast.success('Logged out successfully');
+            } else if (event === 'TOKEN_REFRESHED' && currentSession) {
+              setSession(currentSession);
+              setUser(currentSession.user);
+            }
+          }
+        );
+
+        // Then check for existing session
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error("AuthContext - Error getting session:", error);
-          if (mounted) {
-            setLoading(false);
-            setIsInitialized(true);
-          }
-          return;
+        } else if (initialSession?.user) {
+          console.log("AuthContext - Found existing session");
+          setSession(initialSession);
+          setUser(initialSession.user);
+          await fetchUserProfile(initialSession.user.id);
         }
         
         if (mounted) {
-          setSession(initialSession);
-          setUser(initialSession?.user ?? null);
-          
-          if (initialSession?.user) {
-            await fetchUserProfile(initialSession.user.id);
-          }
-          
           setLoading(false);
-          setIsInitialized(true);
+          setInitialized(true);
         }
+
+        return () => {
+          mounted = false;
+          subscription.unsubscribe();
+        };
       } catch (error) {
         console.error("AuthContext - Exception during initialization:", error);
         if (mounted) {
           setLoading(false);
-          setIsInitialized(true);
+          setInitialized(true);
         }
       }
     };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        if (!mounted) return;
-        
-        console.log("AuthContext - Auth state changed:", event);
-        
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        if (event === 'SIGNED_IN' && currentSession?.user) {
-          // Defer async operations
-          setTimeout(async () => {
-            await fetchUserProfile(currentSession.user.id);
-            sonnerToast.success('Successfully logged in!', {
-              description: 'Welcome back to AdiCorp Management'
-            });
-          }, 0);
-        } else if (event === 'SIGNED_OUT') {
-          setUserProfile(null);
-          sonnerToast.success('Logged out successfully');
-        }
-        
-        // Update loading state after auth state change
-        if (mounted && isInitialized) {
-          setLoading(false);
-        }
-      }
-    );
 
     initializeAuth();
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
   }, []);
 

@@ -11,14 +11,12 @@ export default function Auth() {
   const from = location.state?.from?.pathname || "/dashboard";
 
   useEffect(() => {
-    // If user is already logged in, redirect to dashboard or the page they came from
-    if (user && !loading) {
-      console.log("Auth - User already logged in, redirecting to:", from);
+    if (!loading && user) {
+      console.log("Auth - User logged in, redirecting to:", from);
       navigate(from, { replace: true });
     }
   }, [user, loading, navigate, from]);
 
-  // Show loading while checking auth state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-adicorp-dark">
@@ -30,6 +28,5 @@ export default function Auth() {
     );
   }
 
-  // Show auth form only if not logged in
-  return !user ? <AuthForm /> : null;
+  return user ? null : <AuthForm />;
 }

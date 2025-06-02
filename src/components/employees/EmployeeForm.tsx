@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { EmployeeRow } from "@/types/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -47,7 +46,6 @@ const ranks = [
   "Executive"
 ];
 
-// Updated schema for monthly salary
 const employeeSchema = z.object({
   name: z.string().min(1, { message: "Name is required" }),
   rank: z.string().min(1, { message: "Rank is required" }),
@@ -102,10 +100,13 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             return;
           }
 
+          console.log("Fetching employee with ID:", employeeId, "for company:", userProfile?.company_id);
+          
           const { data, error } = await supabase
             .from('employees')
             .select('*')
             .eq('id', employeeId)
+            .eq('company_id', userProfile?.company_id) // Filter by company
             .single();
             
           if (error) {
@@ -117,7 +118,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             form.reset({
               name: data.name,
               rank: data.rank,
-              monthly_salary: Number(data.wage_rate), // Convert existing wage_rate to monthly_salary
+              monthly_salary: Number(data.wage_rate),
               status: data.status as "active" | "inactive"
             });
           }
@@ -136,7 +137,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       
       fetchEmployee();
     }
-  }, [isOpen, isEditing, employeeId, toast, onClose, session, user, form]);
+  }, [isOpen, isEditing, employeeId, toast, onClose, session, user, form, userProfile?.company_id]);
   
   const handleSubmit = async (values: FormValues) => {
     try {
@@ -169,10 +170,11 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           .update({
             name: values.name,
             rank: values.rank,
-            wage_rate: values.monthly_salary, // Store monthly salary in wage_rate field
+            wage_rate: values.monthly_salary,
             status: values.status
           })
-          .eq('id', employeeId);
+          .eq('id', employeeId)
+          .eq('company_id', userProfile.company_id); // Ensure company ownership
           
         if (error) {
           console.error("Error updating employee:", error);
@@ -189,7 +191,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           .insert({
             name: values.name,
             rank: values.rank,
-            wage_rate: values.monthly_salary, // Store monthly salary in wage_rate field
+            wage_rate: values.monthly_salary,
             status: values.status,
             company_id: userProfile.company_id
           });
@@ -219,7 +221,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
 
   const renderCompanySetupNeeded = () => (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md">
         <div className="text-center py-6">
           <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Company Setup Required</h2>
@@ -248,7 +250,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   if (isFetching) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md">
           <div className="flex justify-center items-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
           </div>
@@ -259,7 +261,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 will-change-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Employee" : "Add New Employee"}
