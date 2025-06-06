@@ -220,7 +220,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
 
   const renderCompanySetupNeeded = () => (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md">
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-[100]">
         <div className="text-center py-6">
           <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Company Setup Required</h2>
@@ -249,7 +249,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   if (isFetching) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md">
+        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-[100]">
           <div className="flex justify-center items-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
           </div>
@@ -260,7 +260,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md">
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-[100] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Employee" : "Add New Employee"}
@@ -307,7 +307,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
                         <SelectValue placeholder="Select a position" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="bg-adicorp-dark-light border-white/10 z-[60]">
+                    <SelectContent className="bg-adicorp-dark-light border-white/10 z-[110]">
                       {ranks.map((rank) => (
                         <SelectItem key={rank} value={rank}>{rank}</SelectItem>
                       ))}
@@ -352,7 +352,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="bg-adicorp-dark-light border-white/10 z-[60]">
+                    <SelectContent className="bg-adicorp-dark-light border-white/10 z-[110]">
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>

@@ -1,8 +1,8 @@
+
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import TestimonialsCarousel from "@/components/ui/testimonials-carousel";
 import { 
   Users, 
   Clock, 
@@ -10,7 +10,6 @@ import {
   TrendingUp, 
   Shield, 
   Zap,
-  Star,
   ChevronRight,
   Play,
   CheckCircle,
@@ -27,7 +26,32 @@ import {
   Lock,
   Cpu,
   Brain,
-  Network
+  Network,
+  FileSpreadsheet,
+  Calendar,
+  MessageCircle,
+  Settings,
+  Monitor,
+  Smartphone,
+  Tablet,
+  Cloud,
+  Activity,
+  PieChart,
+  LineChart,
+  Building2,
+  UserCheck,
+  Bell,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  Briefcase,
+  GraduationCap,
+  Coffee,
+  Layers,
+  Boxes,
+  GitBranch,
+  Workflow
 } from "lucide-react";
 
 interface Particle {
@@ -146,85 +170,127 @@ export default function Index() {
   const features = [
     {
       icon: Users,
-      title: "Advanced Employee Management",
-      description: "Comprehensive employee management system with detailed tracking, performance analytics, and streamlined workforce optimization for modern businesses.",
+      title: "Employee Management System",
+      description: "Comprehensive employee database with detailed profiles, role management, and performance tracking capabilities for effective workforce administration.",
       color: "text-blue-400",
       bgColor: "bg-blue-500/10",
       gradient: "from-blue-400 to-cyan-400"
     },
     {
       icon: Clock,
-      title: "Smart Attendance Tracking",
-      description: "Automated attendance tracking with pattern analysis, absence prediction, and intelligent recommendations for workforce planning and productivity enhancement.",
+      title: "Advanced Time Tracking",
+      description: "Real-time attendance monitoring with automated check-in/out, overtime calculations, and detailed timesheets for precise workforce management.",
       color: "text-purple-400",
       bgColor: "bg-purple-500/10",
       gradient: "from-purple-400 to-violet-400"
     },
     {
       icon: DollarSign,
-      title: "Automated Payroll Processing",
-      description: "Streamlined payroll processing with real-time calculations, tax compliance, and automated salary management for Pakistani regulations and standards.",
+      title: "Payroll Management",
+      description: "Automated salary calculations, tax deductions, bonus processing, and compliance with Pakistani labor laws for seamless payroll operations.",
       color: "text-indigo-400",
       bgColor: "bg-indigo-500/10",
       gradient: "from-indigo-400 to-blue-400"
     },
     {
       icon: BarChart3,
-      title: "Comprehensive Analytics Suite",
-      description: "Detailed reporting and analytics with real-time dashboards, trend analysis, and actionable insights for strategic business decision making.",
+      title: "Analytics & Reports",
+      description: "Interactive dashboards with real-time metrics, custom reports, and data visualization for informed business decision making.",
       color: "text-violet-400",
       bgColor: "bg-violet-500/10",
       gradient: "from-violet-400 to-purple-400"
     },
     {
       icon: Shield,
-      title: "Enterprise-Grade Security",
-      description: "Bank-level encryption, secure data protection, and advanced access control protecting your workforce data with industry-standard cybersecurity.",
+      title: "Security & Compliance",
+      description: "Enterprise-grade security with role-based access control, data encryption, and compliance with industry standards and regulations.",
       color: "text-blue-500",
       bgColor: "bg-blue-600/10",
       gradient: "from-blue-500 to-indigo-500"
     },
     {
-      icon: Zap,
-      title: "High-Speed Performance",
-      description: "Optimized infrastructure with fast loading times, efficient processing, and real-time synchronization across multiple devices and platforms.",
+      icon: Workflow,
+      title: "Workflow Automation",
+      description: "Streamlined business processes with automated workflows, approval chains, and notification systems for increased efficiency.",
       color: "text-cyan-400",
       bgColor: "bg-cyan-500/10",
       gradient: "from-cyan-400 to-blue-400"
+    }
+  ];
+
+  const advancedFeatures = [
+    {
+      icon: FileSpreadsheet,
+      title: "Document Management",
+      description: "Centralized document storage with version control and secure sharing capabilities.",
+      color: "text-emerald-400"
     },
     {
-      icon: Database,
-      title: "Intelligent Data Management",
-      description: "Robust database architecture with automated backups, data optimization, and seamless scaling for growing business requirements.",
-      color: "text-purple-500",
-      bgColor: "bg-purple-600/10",
-      gradient: "from-purple-500 to-violet-500"
+      icon: Calendar,
+      title: "Scheduling System",
+      description: "Advanced scheduling with calendar integration and automated notifications.",
+      color: "text-orange-400"
     },
     {
-      icon: Target,
-      title: "Strategic Goal Management",
-      description: "Goal setting and tracking system with performance monitoring, automated milestone tracking, and intelligent resource allocation optimization.",
-      color: "text-indigo-500",
-      bgColor: "bg-indigo-600/10",
-      gradient: "from-indigo-500 to-blue-500"
+      icon: MessageCircle,
+      title: "Communication Hub",
+      description: "Internal messaging system with team collaboration features.",
+      color: "text-pink-400"
     },
     {
-      icon: Lock,
-      title: "Advanced Privacy Protection",
-      description: "Comprehensive privacy controls with data encryption, secure access management, and full compliance with privacy regulations and standards.",
-      color: "text-violet-500",
-      bgColor: "bg-violet-600/10",
-      gradient: "from-violet-500 to-purple-500"
+      icon: Building2,
+      title: "Multi-Location Support",
+      description: "Manage multiple office locations with centralized control.",
+      color: "text-teal-400"
+    },
+    {
+      icon: UserCheck,
+      title: "Performance Reviews",
+      description: "Automated performance evaluation with goal tracking.",
+      color: "text-yellow-400"
+    },
+    {
+      icon: GraduationCap,
+      title: "Training Management",
+      description: "Employee development tracking with skill assessment.",
+      color: "text-red-400"
+    }
+  ];
+
+  const integrationFeatures = [
+    {
+      icon: Monitor,
+      title: "Desktop Application",
+      description: "Native desktop app for enhanced performance and offline capabilities.",
+      color: "text-blue-300"
+    },
+    {
+      icon: Smartphone,
+      title: "Mobile App",
+      description: "iOS and Android apps for on-the-go workforce management.",
+      color: "text-purple-300"
+    },
+    {
+      icon: Cloud,
+      title: "Cloud Integration",
+      description: "Seamless cloud storage with automatic backup and sync.",
+      color: "text-indigo-300"
+    },
+    {
+      icon: Network,
+      title: "API Access",
+      description: "RESTful APIs for custom integrations and third-party connections.",
+      color: "text-violet-300"
     }
   ];
 
   const stats = [
-    { value: "15K+", label: "Active Users", color: "text-blue-400", icon: Users },
+    { value: "25K+", label: "Active Users", color: "text-blue-400", icon: Users },
     { value: "99.99%", label: "Uptime", color: "text-purple-400", icon: TrendingUp },
     { value: "24/7", label: "Support", color: "text-indigo-400", icon: Shield },
-    { value: "500+", label: "Companies", color: "text-violet-400", icon: Award },
-    { value: "1M+", label: "Records Managed", color: "text-blue-500", icon: Database },
-    { value: "<2s", label: "Load Time", color: "text-cyan-400", icon: Rocket }
+    { value: "1000+", label: "Companies", color: "text-violet-400", icon: Award },
+    { value: "5M+", label: "Records Managed", color: "text-blue-500", icon: Database },
+    { value: "<1s", label: "Response Time", color: "text-cyan-400", icon: Rocket }
   ];
   
   return (
@@ -297,26 +363,25 @@ export default function Index() {
           <div className="container px-4 md:px-6 flex flex-col items-center text-center gap-8">
             <div className={`space-y-6 transition-all duration-1000 delay-300 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
               <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-indigo-600/20 border border-blue-400/30 backdrop-blur-sm hover:scale-105 transition-transform duration-300">
-                <Star className="w-4 h-4 text-blue-300 animate-pulse" />
+                <Sparkles className="w-4 h-4 text-blue-300 animate-pulse" />
+                <span className="text-sm text-blue-200 font-medium">Enterprise-Grade HR Management Platform</span>
                 <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" style={{ animationDelay: '0.5s' }} />
-                <span className="text-sm text-blue-200 font-medium">Professional HR Management Platform</span>
-                <Sparkles className="w-4 h-4 text-indigo-300 animate-pulse" style={{ animationDelay: '1s' }} />
               </div>
               
               <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none text-white animate-fade-in relative">
                 <span className="bg-gradient-to-r from-white via-blue-200 to-purple-300 bg-clip-text text-transparent animate-gradient-x">
-                  The Future of
+                  Revolutionary
                 </span>
                 <br />
                 <span className="bg-gradient-to-r from-blue-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent animate-gradient-x" style={{ animationDelay: '0.5s' }}>
-                  Corporate Solutions
+                  Workforce Management
                 </span>
                 <div className="absolute -inset-4 bg-gradient-to-r from-blue-400/20 via-transparent to-purple-400/20 blur-2xl -z-10 animate-pulse"></div>
               </h1>
               
               <p className="mx-auto max-w-[800px] text-white/80 text-lg md:text-xl leading-relaxed hover:text-white/95 transition-colors duration-300">
-                Experience the next evolution in employee management with <span className="text-blue-300 font-semibold">automated workflows</span>, 
-                comprehensive analytics, and enterprise-grade performance. Built for the growing businesses and corporations of Pakistan.
+                Transform your business operations with our comprehensive <span className="text-blue-300 font-semibold">workforce management solution</span>. 
+                Streamline processes, boost productivity, and scale your organization with confidence.
               </p>
             </div>
             
@@ -328,7 +393,7 @@ export default function Index() {
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                 <Rocket className="w-5 h-5 mr-2 relative z-10" />
-                <span className="relative z-10">Launch Your Platform</span>
+                <span className="relative z-10">Start Free Trial</span>
                 <ChevronRight className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
               </Button>
               
@@ -336,15 +401,15 @@ export default function Index() {
                 variant="outline" 
                 size="lg"
                 className="border-white/30 hover:bg-white/10 backdrop-blur-sm text-lg px-8 py-4 rounded-xl transform hover:scale-105 transition-all duration-300 relative overflow-hidden group text-white/90 hover:text-white"
-                onClick={() => window.open("https://docs.example.com", "_blank")}
+                onClick={() => window.open("https://demo.adicorp.com", "_blank")}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 via-blue-400/10 to-blue-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
                 <Play className="w-5 h-5 mr-2 relative z-10" />
-                <span className="relative z-10">See Demo</span>
+                <span className="relative z-10">Watch Demo</span>
               </Button>
             </div>
 
-            {/* Enhanced Floating Stats Grid with blue theme */}
+            {/* Enhanced Stats Grid */}
             <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mt-16 transition-all duration-1000 delay-700 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
               {stats.map((stat, index) => (
                 <div key={index} className="text-center group cursor-pointer transform hover:scale-110 transition-all duration-300">
@@ -364,7 +429,7 @@ export default function Index() {
           </div>
         </section>
         
-        {/* Enhanced Features Section */}
+        {/* Core Features Section */}
         <section className="w-full py-16 md:py-24 bg-gradient-to-b from-slate-950 via-blue-950/20 to-slate-950 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-400/5 via-transparent to-purple-400/5"></div>
           
@@ -372,12 +437,12 @@ export default function Index() {
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-white mb-4 relative">
                 <span className="bg-gradient-to-r from-blue-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent animate-gradient-x">
-                  Professional Technology Stack
+                  Core Management Features
                 </span>
                 <div className="absolute -inset-2 bg-gradient-to-r from-blue-400/10 via-transparent to-purple-400/10 blur-xl -z-10"></div>
               </h2>
               <p className="mx-auto max-w-[600px] text-white/80 text-lg">
-                Advanced automation, comprehensive analytics, and enterprise-grade capabilities for modern corporate management.
+                Comprehensive tools designed for modern business operations and workforce optimization.
               </p>
             </div>
             
@@ -423,19 +488,61 @@ export default function Index() {
           </div>
         </section>
 
-        {/* Enhanced Testimonials Section */}
-        <section className="w-full py-16 md:py-24 bg-gradient-to-b from-slate-950 via-blue-950/15 to-slate-950 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.1),transparent_50%)]"></div>
-          
+        {/* Advanced Features Section */}
+        <section className="w-full py-16 md:py-24 bg-gradient-to-b from-slate-950 via-indigo-950/15 to-slate-950 relative overflow-hidden">
           <div className="container px-4 md:px-6 relative z-10">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl text-white mb-4">
-                Trusted by <span className="bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">Industry Leaders</span>
+                Advanced <span className="bg-gradient-to-r from-indigo-300 to-purple-300 bg-clip-text text-transparent">Capabilities</span>
               </h2>
-              <p className="text-white/80 text-lg">Powering the future of work across Pakistan and beyond</p>
+              <p className="mx-auto max-w-[600px] text-white/80 text-lg">
+                Extended functionality for comprehensive business management and growth.
+              </p>
             </div>
             
-            <TestimonialsCarousel />
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+              {advancedFeatures.map((feature, index) => (
+                <div key={index} className="group relative p-6 rounded-xl bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm border border-indigo-400/20 hover:border-indigo-400/50 transition-all duration-300 transform hover:scale-105">
+                  <feature.icon className={`h-6 w-6 ${feature.color} mb-4 group-hover:scale-110 transition-transform duration-300`} />
+                  <h4 className="text-lg font-semibold text-white mb-2 group-hover:text-indigo-200 transition-colors duration-300">
+                    {feature.title}
+                  </h4>
+                  <p className="text-white/70 text-sm group-hover:text-white/90 transition-colors duration-300">
+                    {feature.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Integration & Platform Section */}
+        <section className="w-full py-16 md:py-24 bg-gradient-to-b from-slate-950 via-purple-950/15 to-slate-950 relative overflow-hidden">
+          <div className="container px-4 md:px-6 relative z-10">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl text-white mb-4">
+                Multi-Platform <span className="bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">Access</span>
+              </h2>
+              <p className="mx-auto max-w-[600px] text-white/80 text-lg">
+                Access your workforce management system from anywhere, on any device.
+              </p>
+            </div>
+            
+            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+              {integrationFeatures.map((feature, index) => (
+                <div key={index} className="group text-center p-8 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm border border-purple-400/20 hover:border-purple-400/50 transition-all duration-300 transform hover:scale-105">
+                  <div className="inline-block p-4 rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 mb-6 group-hover:scale-110 transition-transform duration-300">
+                    <feature.icon className={`h-8 w-8 ${feature.color}`} />
+                  </div>
+                  <h4 className="text-lg font-semibold text-white mb-3 group-hover:text-purple-200 transition-colors duration-300">
+                    {feature.title}
+                  </h4>
+                  <p className="text-white/70 text-sm group-hover:text-white/90 transition-colors duration-300">
+                    {feature.description}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
         
@@ -448,14 +555,14 @@ export default function Index() {
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-white">
                 Ready to{" "}
                 <span className="bg-gradient-to-r from-blue-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent animate-gradient-x">
-                  Transform
+                  Revolutionize
                 </span>
                 {" "}Your Business?
               </h2>
               
               <p className="text-white/80 text-lg md:text-xl leading-relaxed">
-                Join the next generation of professional businesses. Experience the power of comprehensive workforce management 
-                and unlock your organization's true potential.
+                Join thousands of companies already using AdiCorp to streamline their operations and boost productivity. 
+                Start your transformation today.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
@@ -466,13 +573,13 @@ export default function Index() {
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                   <Rocket className="w-5 h-5 mr-2 relative z-10" />
-                  <span className="relative z-10">Start Your Journey</span>
+                  <span className="relative z-10">Get Started Now</span>
                   <ChevronRight className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
                 </Button>
                 
                 <div className="flex items-center gap-2 text-white/70 group">
                   <CheckCircle className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform duration-300" />
-                  <span className="group-hover:text-white/90 transition-colors duration-300">Enterprise-ready • Instant deployment</span>
+                  <span className="group-hover:text-white/90 transition-colors duration-300">Free 30-day trial • No credit card required</span>
                 </div>
               </div>
             </div>
@@ -480,18 +587,18 @@ export default function Index() {
         </section>
       </main>
       
-      {/* Enhanced Footer with blue theme */}
+      {/* Enhanced Footer */}
       <footer className="flex flex-col gap-2 sm:flex-row py-8 w-full px-4 md:px-6 border-t border-blue-400/20 bg-slate-950/60 backdrop-blur-sm relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-400/5 via-transparent to-purple-400/5"></div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full relative z-10">
           <p className="text-sm text-white/60">
-            © 2025 AdiCorp. Pioneering the future of workforce intelligence.
+            © 2025 AdiCorp. Revolutionizing workforce management solutions.
           </p>
           
           <div className="flex items-center gap-3 sm:ml-auto group">
             <Code className="w-4 h-4 text-blue-300 animate-pulse" />
-            <span className="text-sm text-white/70">Engineered with</span>
+            <span className="text-sm text-white/70">Crafted with</span>
             <Heart className="w-4 h-4 text-red-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
             <span className="text-sm text-white/70">by</span>
             <span className="text-sm font-semibold bg-gradient-to-r from-blue-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent animate-gradient-x">
