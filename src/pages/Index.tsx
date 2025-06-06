@@ -99,8 +99,8 @@ export default function Index() {
           particle.x, particle.y, 0,
           particle.x, particle.y, 2
         );
-        gradient.addColorStop(0, `rgba(155, 135, 245, ${opacity})`);
-        gradient.addColorStop(1, `rgba(155, 135, 245, 0)`);
+        gradient.addColorStop(0, `rgba(139, 92, 246, ${opacity})`);
+        gradient.addColorStop(1, `rgba(139, 92, 246, 0)`);
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -215,7 +215,7 @@ export default function Index() {
   ];
 
   const stats = [
-    { value: "2500+", label: "Active Users", color: "text-adicorp-purple", icon: Users },
+    { value: "2500+", label: "Active Users", color: "text-purple-400", icon: Users },
     { value: "99.9%", label: "Uptime", color: "text-green-400", icon: TrendingUp },
     { value: "24/7", label: "Support", color: "text-blue-400", icon: Shield },
     { value: "150+", label: "Companies", color: "text-yellow-400", icon: Award },
@@ -224,7 +224,7 @@ export default function Index() {
   ];
   
   return (
-    <div className="flex min-h-screen flex-col bg-adicorp-dark relative overflow-hidden">
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Enhanced Particle Canvas */}
       <canvas
         ref={canvasRef}
@@ -234,7 +234,7 @@ export default function Index() {
 
       {/* Enhanced Mouse Follower */}
       <div
-        className="fixed w-6 h-6 bg-gradient-to-r from-adicorp-purple to-blue-500 rounded-full pointer-events-none z-50 transition-all duration-200 ease-out blur-sm"
+        className="fixed w-6 h-6 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full pointer-events-none z-50 transition-all duration-200 ease-out blur-sm"
         style={{
           left: mousePosition.x - 12,
           top: mousePosition.y - 12,
@@ -246,32 +246,32 @@ export default function Index() {
       {/* Enhanced Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div 
-          className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-gradient-to-r from-adicorp-purple/40 to-blue-500/40 blur-3xl animate-pulse"
+          className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-gradient-to-r from-purple-500/40 to-pink-500/40 blur-3xl animate-pulse"
           style={{ transform: `translateY(${scrollY * 0.1}px)` }}
         />
         <div 
-          className="absolute top-1/2 -left-40 w-80 h-80 rounded-full bg-gradient-to-r from-blue-500/40 to-green-500/40 blur-3xl animate-pulse"
+          className="absolute top-1/2 -left-40 w-80 h-80 rounded-full bg-gradient-to-r from-blue-500/40 to-purple-500/40 blur-3xl animate-pulse"
           style={{ animationDelay: '1s', transform: `translateY(${scrollY * 0.2}px)` }}
         />
         <div 
-          className="absolute bottom-20 right-20 w-60 h-60 rounded-full bg-gradient-to-r from-green-500/40 to-purple-500/40 blur-2xl animate-pulse"
+          className="absolute bottom-20 right-20 w-60 h-60 rounded-full bg-gradient-to-r from-pink-500/40 to-purple-500/40 blur-2xl animate-pulse"
           style={{ animationDelay: '2s', transform: `translateY(${scrollY * 0.15}px)` }}
         />
         
         {/* Enhanced Floating geometric shapes */}
-        <div className="absolute top-1/4 left-1/4 w-24 h-24 border-2 border-adicorp-purple/30 rotate-45 animate-spin-slow hover:border-adicorp-purple/60 transition-colors duration-500"></div>
-        <div className="absolute top-3/4 right-1/4 w-20 h-20 border-2 border-blue-400/30 rounded-full animate-bounce-slow hover:border-blue-400/60 transition-colors duration-500"></div>
-        <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-gradient-to-r from-adicorp-purple/20 to-transparent rotate-12 animate-pulse hover:from-adicorp-purple/40 transition-all duration-500"></div>
-        <div className="absolute top-1/3 left-1/2 w-12 h-12 bg-gradient-to-r from-blue-500/20 to-cyan-400/20 rounded-lg animate-float"></div>
+        <div className="absolute top-1/4 left-1/4 w-24 h-24 border-2 border-purple-500/30 rotate-45 animate-spin-slow hover:border-purple-500/60 transition-colors duration-500"></div>
+        <div className="absolute top-3/4 right-1/4 w-20 h-20 border-2 border-pink-400/30 rounded-full animate-bounce-slow hover:border-pink-400/60 transition-colors duration-500"></div>
+        <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-gradient-to-r from-purple-500/20 to-transparent rotate-12 animate-pulse hover:from-purple-500/40 transition-all duration-500"></div>
+        <div className="absolute top-1/3 left-1/2 w-12 h-12 bg-gradient-to-r from-blue-500/20 to-pink-400/20 rounded-lg animate-float"></div>
       </div>
 
-      <header className={`px-4 lg:px-6 h-16 flex items-center backdrop-blur-sm bg-adicorp-dark/90 border-b border-white/10 sticky top-0 z-50 transition-all duration-700 ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+      <header className={`px-4 lg:px-6 h-16 flex items-center backdrop-blur-sm bg-slate-900/90 border-b border-purple-500/20 sticky top-0 z-50 transition-all duration-700 ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
         <div className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate("/")}>
-          <div className="relative w-12 h-12 rounded-xl bg-gradient-to-r from-adicorp-purple via-blue-500 to-purple-600 flex items-center justify-center transform group-hover:scale-110 transition-all duration-300 shadow-lg group-hover:shadow-adicorp-purple/50">
+          <div className="relative w-12 h-12 rounded-xl bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 flex items-center justify-center transform group-hover:scale-110 transition-all duration-300 shadow-lg group-hover:shadow-purple-500/50">
             <span className="text-white font-bold text-lg relative z-10">AC</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-adicorp-purple to-blue-500 rounded-xl blur opacity-0 group-hover:opacity-70 transition-opacity duration-300"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl blur opacity-0 group-hover:opacity-70 transition-opacity duration-300"></div>
           </div>
-          <span className="text-xl font-bold text-white bg-gradient-to-r from-white via-adicorp-purple-light to-blue-400 bg-clip-text text-transparent">
+          <span className="text-xl font-bold text-white bg-gradient-to-r from-white via-purple-300 to-pink-400 bg-clip-text text-transparent">
             AdiCorp
           </span>
         </div>
@@ -282,7 +282,7 @@ export default function Index() {
             onClick={() => navigate("/auth")}
           >
             <span className="relative z-10">Login</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-adicorp-purple/0 via-adicorp-purple/20 to-adicorp-purple/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/20 to-purple-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
           </Button>
         </nav>
       </header>
@@ -292,27 +292,27 @@ export default function Index() {
         <section className="w-full py-12 md:py-24 lg:py-32 flex items-center justify-center min-h-screen relative">
           <div className="container px-4 md:px-6 flex flex-col items-center text-center gap-8">
             <div className={`space-y-6 transition-all duration-1000 delay-300 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-              <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-adicorp-purple/20 via-blue-500/20 to-purple-600/20 border border-adicorp-purple/30 backdrop-blur-sm hover:scale-105 transition-transform duration-300">
-                <Star className="w-4 h-4 text-adicorp-purple animate-pulse" />
-                <Sparkles className="w-4 h-4 text-blue-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
-                <span className="text-sm text-adicorp-purple-light font-medium">Trusted by 2500+ Companies Worldwide</span>
+              <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-purple-600/20 border border-purple-500/30 backdrop-blur-sm hover:scale-105 transition-transform duration-300">
+                <Star className="w-4 h-4 text-purple-400 animate-pulse" />
+                <Sparkles className="w-4 h-4 text-pink-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
+                <span className="text-sm text-purple-300 font-medium">Trusted by 2500+ Companies Worldwide</span>
                 <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" style={{ animationDelay: '1s' }} />
               </div>
               
               <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none text-white animate-fade-in relative">
-                <span className="bg-gradient-to-r from-white via-adicorp-purple-light to-blue-400 bg-clip-text text-transparent animate-gradient-x">
+                <span className="bg-gradient-to-r from-white via-purple-300 to-pink-400 bg-clip-text text-transparent animate-gradient-x">
                   Transform Your Workforce
                 </span>
                 <br />
-                <span className="bg-gradient-to-r from-adicorp-purple via-purple-400 to-pink-400 bg-clip-text text-transparent animate-gradient-x" style={{ animationDelay: '0.5s' }}>
+                <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-600 bg-clip-text text-transparent animate-gradient-x" style={{ animationDelay: '0.5s' }}>
                   Management Experience
                 </span>
-                <div className="absolute -inset-4 bg-gradient-to-r from-adicorp-purple/20 via-transparent to-blue-500/20 blur-2xl -z-10 animate-pulse"></div>
+                <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/20 via-transparent to-pink-500/20 blur-2xl -z-10 animate-pulse"></div>
               </h1>
               
               <p className="mx-auto max-w-[800px] text-white/70 text-lg md:text-xl leading-relaxed hover:text-white/90 transition-colors duration-300">
                 AdiCorp is the next-generation employee management system designed for modern businesses in Pakistan. 
-                Experience <span className="text-adicorp-purple font-semibold">unparalleled performance</span> with AI-powered analytics, 
+                Experience <span className="text-purple-400 font-semibold">unparalleled performance</span> with AI-powered analytics, 
                 seamless automation, and enterprise-grade security.
               </p>
             </div>
@@ -320,7 +320,7 @@ export default function Index() {
             <div className={`space-y-4 sm:space-y-0 sm:space-x-4 sm:flex transition-all duration-1000 delay-500 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
               <Button
                 size="lg"
-                className="bg-gradient-to-r from-adicorp-purple via-purple-600 to-blue-600 hover:from-adicorp-purple-dark hover:via-purple-700 hover:to-blue-700 btn-glow transform hover:scale-110 transition-all duration-300 shadow-2xl text-lg px-8 py-4 rounded-xl relative overflow-hidden group"
+                className="bg-gradient-to-r from-purple-500 via-pink-600 to-purple-600 hover:from-purple-600 hover:via-pink-700 hover:to-purple-700 btn-glow transform hover:scale-110 transition-all duration-300 shadow-2xl text-lg px-8 py-4 rounded-xl relative overflow-hidden group"
                 onClick={() => navigate("/auth")}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
@@ -335,7 +335,7 @@ export default function Index() {
                 className="border-white/20 hover:bg-white/10 backdrop-blur-sm text-lg px-8 py-4 rounded-xl transform hover:scale-105 transition-all duration-300 relative overflow-hidden group"
                 onClick={() => window.open("https://docs.example.com", "_blank")}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-adicorp-purple/0 via-adicorp-purple/10 to-adicorp-purple/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
                 <span className="relative z-10">Watch Demo</span>
               </Button>
             </div>
@@ -344,7 +344,7 @@ export default function Index() {
             <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mt-12 transition-all duration-1000 delay-700 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
               {stats.map((stat, index) => (
                 <div key={index} className="text-center group cursor-pointer transform hover:scale-110 transition-all duration-300">
-                  <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm border border-white/10 hover:border-adicorp-purple/50 transition-all duration-300">
+                  <div className="relative p-4 rounded-xl bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300">
                     <div className={`text-2xl md:text-3xl font-bold ${stat.color} group-hover:scale-125 transition-all duration-300 relative z-10`}>
                       {stat.value}
                     </div>
@@ -361,16 +361,16 @@ export default function Index() {
         </section>
         
         {/* Enhanced Features Section */}
-        <section className="w-full py-16 md:py-24 bg-gradient-to-b from-adicorp-dark via-adicorp-dark-light to-adicorp-dark relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-adicorp-purple/5 via-transparent to-blue-500/5"></div>
+        <section className="w-full py-16 md:py-24 bg-gradient-to-b from-slate-900 via-purple-900/50 to-slate-900 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 via-transparent to-pink-500/5"></div>
           
           <div className="container px-4 md:px-6 relative z-10">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-white mb-4 relative">
-                <span className="bg-gradient-to-r from-adicorp-purple via-blue-400 to-purple-600 bg-clip-text text-transparent animate-gradient-x">
+                <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-600 bg-clip-text text-transparent animate-gradient-x">
                   Powerful Features & Capabilities
                 </span>
-                <div className="absolute -inset-2 bg-gradient-to-r from-adicorp-purple/10 via-transparent to-blue-500/10 blur-xl -z-10"></div>
+                <div className="absolute -inset-2 bg-gradient-to-r from-purple-500/10 via-transparent to-pink-500/10 blur-xl -z-10"></div>
               </h2>
               <p className="mx-auto max-w-[600px] text-white/70 text-lg">
                 Everything you need to manage your workforce efficiently, effectively, and intelligently.
@@ -381,7 +381,7 @@ export default function Index() {
               {features.map((feature, index) => (
                 <div 
                   key={index}
-                  className={`group relative overflow-hidden rounded-2xl p-6 backdrop-blur-sm border border-white/10 hover:border-adicorp-purple/50 transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 ${feature.bgColor} bg-opacity-10 cursor-pointer`}
+                  className={`group relative overflow-hidden rounded-2xl p-6 backdrop-blur-sm border border-purple-500/20 hover:border-purple-500/50 transition-all duration-500 transform hover:scale-105 hover:-translate-y-2 ${feature.bgColor} bg-opacity-10 cursor-pointer`}
                   onMouseEnter={() => setHoveredFeature(index)}
                   onMouseLeave={() => setHoveredFeature(null)}
                   style={{ 
@@ -397,7 +397,7 @@ export default function Index() {
                       <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} opacity-0 group-hover:opacity-30 transition-opacity duration-300`}></div>
                     </div>
                     
-                    <h3 className="text-xl font-bold text-white mb-3 group-hover:text-adicorp-purple-light transition-colors duration-300">
+                    <h3 className="text-xl font-bold text-white mb-3 group-hover:text-purple-300 transition-colors duration-300">
                       {feature.title}
                     </h3>
                     
@@ -407,11 +407,11 @@ export default function Index() {
                   </div>
                   
                   <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
-                    <ArrowRight className="w-5 h-5 text-adicorp-purple" />
+                    <ArrowRight className="w-5 h-5 text-purple-400" />
                   </div>
                   
                   {hoveredFeature === index && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-adicorp-purple/10 via-transparent to-blue-500/10 animate-pulse"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-transparent to-pink-500/10 animate-pulse"></div>
                   )}
                 </div>
               ))}
@@ -420,13 +420,13 @@ export default function Index() {
         </section>
 
         {/* Enhanced Testimonials Section with Carousel */}
-        <section className="w-full py-16 md:py-24 bg-adicorp-dark-light relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(155,135,245,0.1),transparent_50%)]"></div>
+        <section className="w-full py-16 md:py-24 bg-gradient-to-b from-slate-900 via-purple-900/30 to-slate-900 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.1),transparent_50%)]"></div>
           
           <div className="container px-4 md:px-6 relative z-10">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl text-white mb-4">
-                What Our <span className="bg-gradient-to-r from-adicorp-purple to-blue-400 bg-clip-text text-transparent">Clients Say</span>
+                What Our <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Clients Say</span>
               </h2>
               <p className="text-white/70 text-lg">Trusted by businesses across Pakistan and beyond</p>
             </div>
@@ -436,14 +436,14 @@ export default function Index() {
         </section>
         
         {/* Enhanced CTA Section */}
-        <section className="w-full py-16 md:py-24 bg-gradient-to-t from-adicorp-dark-light to-adicorp-dark relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(155,135,245,0.1),transparent_70%)]"></div>
+        <section className="w-full py-16 md:py-24 bg-gradient-to-t from-purple-900/50 to-slate-900 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.1),transparent_70%)]"></div>
           
           <div className="container px-4 md:px-6 text-center relative z-10">
             <div className="space-y-6 max-w-3xl mx-auto">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-white">
                 Ready to{" "}
-                <span className="bg-gradient-to-r from-adicorp-purple via-blue-400 to-purple-600 bg-clip-text text-transparent animate-gradient-x">
+                <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-600 bg-clip-text text-transparent animate-gradient-x">
                   Transform
                 </span>
                 {" "}Your Business?
@@ -457,7 +457,7 @@ export default function Index() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                 <Button
                   size="lg"
-                  className="bg-gradient-to-r from-adicorp-purple via-purple-600 to-blue-600 hover:from-adicorp-purple-dark hover:via-purple-700 hover:to-blue-700 btn-glow transform hover:scale-110 transition-all duration-300 text-lg px-8 py-4 rounded-xl relative overflow-hidden group"
+                  className="bg-gradient-to-r from-purple-500 via-pink-600 to-purple-600 hover:from-purple-600 hover:via-pink-700 hover:to-purple-700 btn-glow transform hover:scale-110 transition-all duration-300 text-lg px-8 py-4 rounded-xl relative overflow-hidden group"
                   onClick={() => navigate("/auth")}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
@@ -476,8 +476,8 @@ export default function Index() {
       </main>
       
       {/* Enhanced Footer */}
-      <footer className="flex flex-col gap-2 sm:flex-row py-8 w-full px-4 md:px-6 border-t border-white/10 bg-adicorp-dark-light/50 backdrop-blur-sm relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-adicorp-purple/5 via-transparent to-blue-500/5"></div>
+      <footer className="flex flex-col gap-2 sm:flex-row py-8 w-full px-4 md:px-6 border-t border-purple-500/20 bg-slate-900/50 backdrop-blur-sm relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 via-transparent to-pink-500/5"></div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full relative z-10">
           <p className="text-sm text-white/50">
@@ -485,15 +485,15 @@ export default function Index() {
           </p>
           
           <div className="flex items-center gap-3 sm:ml-auto group">
-            <Code className="w-4 h-4 text-adicorp-purple animate-pulse" />
+            <Code className="w-4 h-4 text-purple-400 animate-pulse" />
             <span className="text-sm text-white/60">Proudly developed with</span>
             <Heart className="w-4 h-4 text-red-400 animate-pulse" style={{ animationDelay: '0.5s' }} />
             <span className="text-sm text-white/60">by</span>
-            <span className="text-sm font-semibold bg-gradient-to-r from-adicorp-purple via-blue-400 to-purple-600 bg-clip-text text-transparent animate-gradient-x">
+            <span className="text-sm font-semibold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-600 bg-clip-text text-transparent animate-gradient-x">
               Adil Munawar
             </span>
             <Globe className="w-4 h-4 text-blue-400 animate-pulse" style={{ animationDelay: '1s' }} />
-            <div className="w-2 h-2 rounded-full bg-adicorp-purple animate-pulse"></div>
+            <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
           </div>
         </div>
         
