@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,11 +87,11 @@ export default function ReportsPage() {
       const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
       
-      // Optimize queries by running them in parallel and using more specific selects
+      // Fix: Select all required fields to match EmployeeRow type
       const [employeeResult, attendanceResult] = await Promise.all([
         supabase
           .from('employees')
-          .select('id, name, rank, wage_rate, status')
+          .select('*')
           .eq('company_id', userProfile.company_id)
           .eq('status', 'active')
           .order('name'),
