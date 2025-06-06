@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Dialog,
@@ -261,7 +260,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-[50%] left-[50%] transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-auto">
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Employee" : "Add New Employee"}

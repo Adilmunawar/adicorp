@@ -15,74 +15,74 @@ interface Testimonial {
 const testimonials: Testimonial[] = [
   {
     id: 1,
-    name: "Ahmad Hassan",
+    name: "Muhammad Ahmed",
     company: "TechVision Pakistan",
     position: "CEO",
-    username: "@ahmadhassan",
-    content: "AdiCorp has completely transformed our HR operations. The AI-powered automation is incredible and has saved us countless hours every week. It's exactly what Pakistani businesses need.",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
+    username: "@muhammadahmed",
+    content: "AdiCorp has completely transformed our HR operations. The streamlined employee management system has saved us countless hours every week. It's exactly what Pakistani businesses need.",
+    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face"
   },
   {
     id: 2,
-    name: "Fatima Ali",
+    name: "Fatima Sheikh",
     company: "Digital Solutions Ltd",
     position: "Operations Director",
-    username: "@fatimaali",
-    content: "The platform is incredibly intuitive. We've streamlined our entire workforce management process and the analytics provide insights we never had before.",
+    username: "@fatimasheikh",
+    content: "The platform is incredibly intuitive and user-friendly. We've streamlined our entire workforce management process and the reporting features provide insights we never had before.",
     avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face"
   },
   {
     id: 3,
-    name: "Ayesha Khan",
+    name: "Ayesha Rahman",
     company: "Innovation Hub",
     position: "HR Manager",
-    username: "@ayeshakhan",
-    content: "AdiCorp's automation capabilities are phenomenal. The employee management system is so smooth and efficient that it feels like magic.",
+    username: "@ayesharahman",
+    content: "AdiCorp's automation capabilities are impressive. The employee management system is so smooth and efficient that it has revolutionized our daily operations.",
     avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face"
   },
   {
     id: 4,
-    name: "Zara Ahmed",
+    name: "Zara Khan",
     company: "Future Technologies",
     position: "Product Manager",
-    username: "@zaraahmed",
-    content: "The real-time analytics and reporting features have revolutionized how we make decisions. It's like having a crystal ball for workforce planning.",
+    username: "@zarakhan",
+    content: "The real-time analytics and reporting features have revolutionized how we make decisions. It provides comprehensive insights for effective workforce planning.",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face"
   },
   {
     id: 5,
-    name: "Sana Malik",
+    name: "Sana Ahmed",
     company: "Smart Enterprises",
     position: "CTO",
-    username: "@sanamalik",
-    content: "The integration was seamless and the support team is outstanding. AdiCorp has become an essential part of our daily operations.",
+    username: "@sanaahmed",
+    content: "The integration was seamless and the support team is outstanding. AdiCorp has become an essential part of our daily business operations.",
     avatar: "https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=150&h=150&fit=crop&crop=face"
   },
   {
     id: 6,
-    name: "Mariam Sheikh",
+    name: "Mariam Qureshi",
     company: "Progressive Solutions",
     position: "Founder",
-    username: "@mariamsheikh",
-    content: "Finally, an HR platform that understands the Pakistani market. The compliance features and local regulations support is exceptional.",
+    username: "@mariamqureshi",
+    content: "Finally, an HR platform that understands the Pakistani market. The compliance features and local regulations support is exceptional and reliable.",
     avatar: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=150&h=150&fit=crop&crop=face"
   },
   {
     id: 7,
-    name: "Nida Rashid",
+    name: "Nida Hassan",
     company: "TechForward",
     position: "VP Operations",
-    username: "@nidarashid",
-    content: "The AI insights have helped us identify patterns we never knew existed. Our productivity has increased by 40% since implementing AdiCorp.",
+    username: "@nidahassan",
+    content: "The detailed insights have helped us identify patterns we never knew existed. Our productivity has increased by 40% since implementing AdiCorp.",
     avatar: "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952?w=150&h=150&fit=crop&crop=face"
   },
   {
     id: 8,
-    name: "Hira Bukhari",
+    name: "Hira Malik",
     company: "NextGen Systems",
     position: "Chief Innovation Officer",
-    username: "@hirabukhari",
-    content: "The platform's scalability is impressive. As we've grown from 50 to 500 employees, AdiCorp has effortlessly adapted to our needs.",
+    username: "@hiramalik",
+    content: "The platform's scalability is impressive. As we've grown from 50 to 500 employees, AdiCorp has effortlessly adapted to our expanding needs.",
     avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face"
   },
   {
@@ -91,7 +91,7 @@ const testimonials: Testimonial[] = [
     company: "Digital Innovations",
     position: "Strategy Director",
     username: "@amnajaved",
-    content: "The security features give us complete peace of mind. Our employee data is protected with enterprise-grade encryption and compliance.",
+    content: "The security features give us complete peace of mind. Our employee data is protected with enterprise-grade security and compliance standards.",
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
   }
 ];

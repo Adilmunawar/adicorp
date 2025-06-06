@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -147,32 +146,32 @@ export default function Index() {
   const features = [
     {
       icon: Users,
-      title: "AI-Powered Employee Management",
-      description: "Revolutionary employee management with machine learning insights, predictive analytics, and automated workforce optimization for the future of work.",
+      title: "Advanced Employee Management",
+      description: "Comprehensive employee management system with detailed tracking, performance analytics, and streamlined workforce optimization for modern businesses.",
       color: "text-blue-400",
       bgColor: "bg-blue-500/10",
       gradient: "from-blue-400 to-cyan-400"
     },
     {
-      icon: Brain,
-      title: "Smart Attendance Analytics",
-      description: "Advanced AI algorithms track patterns, predict absences, and provide intelligent recommendations for workforce planning and productivity optimization.",
+      icon: Clock,
+      title: "Smart Attendance Tracking",
+      description: "Automated attendance tracking with pattern analysis, absence prediction, and intelligent recommendations for workforce planning and productivity enhancement.",
       color: "text-purple-400",
       bgColor: "bg-purple-500/10",
       gradient: "from-purple-400 to-violet-400"
     },
     {
-      icon: Cpu,
-      title: "Automated Payroll Engine",
-      description: "Next-generation payroll processing with blockchain security, real-time calculations, and compliance automation for Pakistani regulations.",
+      icon: DollarSign,
+      title: "Automated Payroll Processing",
+      description: "Streamlined payroll processing with real-time calculations, tax compliance, and automated salary management for Pakistani regulations and standards.",
       color: "text-indigo-400",
       bgColor: "bg-indigo-500/10",
       gradient: "from-indigo-400 to-blue-400"
     },
     {
       icon: BarChart3,
-      title: "Predictive Analytics Suite",
-      description: "Machine learning-powered insights with real-time dashboards, trend analysis, and actionable intelligence for strategic decision making.",
+      title: "Comprehensive Analytics Suite",
+      description: "Detailed reporting and analytics with real-time dashboards, trend analysis, and actionable insights for strategic business decision making.",
       color: "text-violet-400",
       bgColor: "bg-violet-500/10",
       gradient: "from-violet-400 to-purple-400"
@@ -180,39 +179,39 @@ export default function Index() {
     {
       icon: Shield,
       title: "Enterprise-Grade Security",
-      description: "Military-level encryption, zero-trust architecture, and advanced threat detection protecting your workforce data with cutting-edge cybersecurity.",
+      description: "Bank-level encryption, secure data protection, and advanced access control protecting your workforce data with industry-standard cybersecurity.",
       color: "text-blue-500",
       bgColor: "bg-blue-600/10",
       gradient: "from-blue-500 to-indigo-500"
     },
     {
-      icon: Network,
-      title: "Quantum-Speed Performance",
-      description: "Ultra-low latency infrastructure with edge computing, distributed processing, and real-time synchronization across global data centers.",
+      icon: Zap,
+      title: "High-Speed Performance",
+      description: "Optimized infrastructure with fast loading times, efficient processing, and real-time synchronization across multiple devices and platforms.",
       color: "text-cyan-400",
       bgColor: "bg-cyan-500/10",
       gradient: "from-cyan-400 to-blue-400"
     },
     {
       icon: Database,
-      title: "Intelligent Data Architecture",
-      description: "Self-healing databases with automated optimization, predictive maintenance, and seamless scaling for enterprise-grade reliability.",
+      title: "Intelligent Data Management",
+      description: "Robust database architecture with automated backups, data optimization, and seamless scaling for growing business requirements.",
       color: "text-purple-500",
       bgColor: "bg-purple-600/10",
       gradient: "from-purple-500 to-violet-500"
     },
     {
       icon: Target,
-      title: "Strategic Goal Intelligence",
-      description: "AI-driven goal setting with performance prediction, automated milestone tracking, and intelligent resource allocation optimization.",
+      title: "Strategic Goal Management",
+      description: "Goal setting and tracking system with performance monitoring, automated milestone tracking, and intelligent resource allocation optimization.",
       color: "text-indigo-500",
       bgColor: "bg-indigo-600/10",
       gradient: "from-indigo-500 to-blue-500"
     },
     {
       icon: Lock,
-      title: "Advanced Privacy Shield",
-      description: "Zero-knowledge architecture with homomorphic encryption, privacy-preserving analytics, and GDPR+ compliance for maximum data protection.",
+      title: "Advanced Privacy Protection",
+      description: "Comprehensive privacy controls with data encryption, secure access management, and full compliance with privacy regulations and standards.",
       color: "text-violet-500",
       bgColor: "bg-violet-600/10",
       gradient: "from-violet-500 to-purple-500"
@@ -220,12 +219,12 @@ export default function Index() {
   ];
 
   const stats = [
-    { value: "15K+", label: "Enterprise Users", color: "text-blue-400", icon: Users },
-    { value: "99.99%", label: "Uptime SLA", color: "text-purple-400", icon: TrendingUp },
-    { value: "24/7", label: "AI Support", color: "text-indigo-400", icon: Shield },
-    { value: "500+", label: "Global Companies", color: "text-violet-400", icon: Award },
-    { value: "1B+", label: "Data Points", color: "text-blue-500", icon: Database },
-    { value: "<100ms", label: "Response Time", color: "text-cyan-400", icon: Rocket }
+    { value: "15K+", label: "Active Users", color: "text-blue-400", icon: Users },
+    { value: "99.99%", label: "Uptime", color: "text-purple-400", icon: TrendingUp },
+    { value: "24/7", label: "Support", color: "text-indigo-400", icon: Shield },
+    { value: "500+", label: "Companies", color: "text-violet-400", icon: Award },
+    { value: "1M+", label: "Records Managed", color: "text-blue-500", icon: Database },
+    { value: "<2s", label: "Load Time", color: "text-cyan-400", icon: Rocket }
   ];
   
   return (
@@ -293,14 +292,14 @@ export default function Index() {
       </header>
       
       <main className="flex-1 relative z-10">
-        {/* Enhanced Hero Section with blue theme */}
+        {/* Enhanced Hero Section */}
         <section className="w-full py-12 md:py-24 lg:py-32 flex items-center justify-center min-h-screen relative">
           <div className="container px-4 md:px-6 flex flex-col items-center text-center gap-8">
             <div className={`space-y-6 transition-all duration-1000 delay-300 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
               <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-indigo-600/20 border border-blue-400/30 backdrop-blur-sm hover:scale-105 transition-transform duration-300">
                 <Star className="w-4 h-4 text-blue-300 animate-pulse" />
                 <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" style={{ animationDelay: '0.5s' }} />
-                <span className="text-sm text-blue-200 font-medium">Next-Gen AI Workforce Platform</span>
+                <span className="text-sm text-blue-200 font-medium">Professional HR Management Platform</span>
                 <Sparkles className="w-4 h-4 text-indigo-300 animate-pulse" style={{ animationDelay: '1s' }} />
               </div>
               
@@ -310,14 +309,14 @@ export default function Index() {
                 </span>
                 <br />
                 <span className="bg-gradient-to-r from-blue-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent animate-gradient-x" style={{ animationDelay: '0.5s' }}>
-                  Workforce Intelligence
+                  Corporate Solutions
                 </span>
                 <div className="absolute -inset-4 bg-gradient-to-r from-blue-400/20 via-transparent to-purple-400/20 blur-2xl -z-10 animate-pulse"></div>
               </h1>
               
               <p className="mx-auto max-w-[800px] text-white/80 text-lg md:text-xl leading-relaxed hover:text-white/95 transition-colors duration-300">
-                Experience the next evolution in employee management with <span className="text-blue-300 font-semibold">AI-powered automation</span>, 
-                predictive analytics, and quantum-speed performance. Built for the ambitious startups and enterprises of Pakistan.
+                Experience the next evolution in employee management with <span className="text-blue-300 font-semibold">automated workflows</span>, 
+                comprehensive analytics, and enterprise-grade performance. Built for the growing businesses and corporations of Pakistan.
               </p>
             </div>
             
@@ -365,7 +364,7 @@ export default function Index() {
           </div>
         </section>
         
-        {/* Enhanced Features Section with blue theme */}
+        {/* Enhanced Features Section */}
         <section className="w-full py-16 md:py-24 bg-gradient-to-b from-slate-950 via-blue-950/20 to-slate-950 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-400/5 via-transparent to-purple-400/5"></div>
           
@@ -373,12 +372,12 @@ export default function Index() {
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-white mb-4 relative">
                 <span className="bg-gradient-to-r from-blue-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent animate-gradient-x">
-                  Revolutionary Technology Stack
+                  Professional Technology Stack
                 </span>
                 <div className="absolute -inset-2 bg-gradient-to-r from-blue-400/10 via-transparent to-purple-400/10 blur-xl -z-10"></div>
               </h2>
               <p className="mx-auto max-w-[600px] text-white/80 text-lg">
-                Cutting-edge AI, machine learning, and quantum computing capabilities for the modern enterprise.
+                Advanced automation, comprehensive analytics, and enterprise-grade capabilities for modern corporate management.
               </p>
             </div>
             
@@ -424,7 +423,7 @@ export default function Index() {
           </div>
         </section>
 
-        {/* Enhanced Testimonials Section with blue theme */}
+        {/* Enhanced Testimonials Section */}
         <section className="w-full py-16 md:py-24 bg-gradient-to-b from-slate-950 via-blue-950/15 to-slate-950 relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.1),transparent_50%)]"></div>
           
@@ -440,7 +439,7 @@ export default function Index() {
           </div>
         </section>
         
-        {/* Enhanced CTA Section with blue theme */}
+        {/* Enhanced CTA Section */}
         <section className="w-full py-16 md:py-24 bg-gradient-to-t from-blue-950/30 to-slate-950 relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.1),transparent_70%)]"></div>
           
@@ -449,13 +448,13 @@ export default function Index() {
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-white">
                 Ready to{" "}
                 <span className="bg-gradient-to-r from-blue-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent animate-gradient-x">
-                  Revolutionize
+                  Transform
                 </span>
-                {" "}Your Workforce?
+                {" "}Your Business?
               </h2>
               
               <p className="text-white/80 text-lg md:text-xl leading-relaxed">
-                Join the next generation of intelligent businesses. Experience the power of AI-driven workforce management 
+                Join the next generation of professional businesses. Experience the power of comprehensive workforce management 
                 and unlock your organization's true potential.
               </p>
               
