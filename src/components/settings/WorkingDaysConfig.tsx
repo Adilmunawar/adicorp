@@ -34,7 +34,7 @@ export default function WorkingDaysConfig() {
   const fetchConfig = async () => {
     try {
       const { data, error } = await supabase
-        .from('working_days_config')
+        .from('working_days_config' as any)
         .select('*')
         .eq('company_id', userProfile?.company_id)
         .maybeSingle();
@@ -42,7 +42,7 @@ export default function WorkingDaysConfig() {
       if (error && error.code !== 'PGRST116') throw error;
 
       if (data) {
-        setConfig(data);
+        setConfig(data as WorkingDayConfig);
       } else {
         // Set default config
         setConfig(prev => ({ ...prev, company_id: userProfile?.company_id || '' }));
@@ -58,7 +58,7 @@ export default function WorkingDaysConfig() {
       if (!userProfile?.company_id) return;
 
       const { error } = await supabase
-        .from('working_days_config')
+        .from('working_days_config' as any)
         .upsert({
           company_id: userProfile.company_id,
           monday: config.monday,

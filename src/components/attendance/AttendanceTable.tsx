@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -327,6 +328,68 @@ export default function AttendanceTable() {
     return (
       <div className="text-center py-8">
         <p className="text-white/70">No active employees found. Please add employees first.</p>
+      </div>
+    );
+  }
+
+  if (!showAttendance) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <Card className="glass-card lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-adicorp-purple" />
+              Select Date
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={handleDateChange}
+              className="rounded-md border border-white/10 bg-adicorp-dark/30 p-3"
+            />
+          </CardContent>
+        </Card>
+        
+        <Card className="glass-card lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {date.toLocaleDateString()}
+              {events.length > 0 && (
+                <div className="flex gap-2 ml-4">
+                  {events.map(event => (
+                    <Badge key={event.id} className="bg-green-500/20 text-green-400">
+                      {event.title}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <p className="text-white/70 text-lg mb-4">
+                {events.some(event => event.type === 'holiday') 
+                  ? "🎉 Holiday - All employees automatically marked present with full pay!"
+                  : "No attendance required for this day."
+                }
+              </p>
+              {events.length > 0 && (
+                <div className="space-y-2">
+                  {events.map(event => (
+                    <div key={event.id} className="p-3 rounded-lg bg-adicorp-dark/30 border border-white/10">
+                      <h3 className="font-medium text-green-400">{event.title}</h3>
+                      {event.description && (
+                        <p className="text-white/70 text-sm mt-1">{event.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

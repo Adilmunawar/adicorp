@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import { WorkingDayConfig, EventRow } from "@/types/events";
@@ -6,7 +7,7 @@ import { WorkingDayConfig, EventRow } from "@/types/events";
 export const getWorkingDaysConfig = async (companyId: string): Promise<WorkingDayConfig> => {
   try {
     const { data, error } = await supabase
-      .from('working_days_config')
+      .from('working_days_config' as any)
       .select('*')
       .eq('company_id', companyId)
       .maybeSingle();
@@ -64,13 +65,13 @@ export const getEventsForDate = async (date: Date, companyId: string): Promise<E
   try {
     const dateString = format(date, 'yyyy-MM-dd');
     const { data, error } = await supabase
-      .from('events')
+      .from('events' as any)
       .select('*')
       .eq('company_id', companyId)
       .eq('date', dateString);
 
     if (error) throw error;
-    return data || [];
+    return (data as EventRow[]) || [];
   } catch (error) {
     console.error("Error fetching events for date:", error);
     return [];

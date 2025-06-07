@@ -36,13 +36,13 @@ export default function EventManager() {
   const fetchEvents = async () => {
     try {
       const { data, error } = await supabase
-        .from('events')
+        .from('events' as any)
         .select('*')
         .eq('company_id', userProfile?.company_id)
         .order('date');
 
       if (error) throw error;
-      setEvents(data || []);
+      setEvents((data as EventRow[]) || []);
     } catch (error) {
       console.error("Error fetching events:", error);
     }
@@ -53,7 +53,7 @@ export default function EventManager() {
       if (!userProfile?.company_id || !formData.title.trim()) return;
 
       const { error } = await supabase
-        .from('events')
+        .from('events' as any)
         .insert({
           company_id: userProfile.company_id,
           title: formData.title,
@@ -85,7 +85,7 @@ export default function EventManager() {
   const handleDeleteEvent = async (eventId: string) => {
     try {
       const { error } = await supabase
-        .from('events')
+        .from('events' as any)
         .delete()
         .eq('id', eventId);
 
