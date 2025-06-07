@@ -1,5 +1,4 @@
 
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import { getWorkingDaysInMonth } from "./workingDays";
 
 export interface SalaryCalculation {
@@ -14,7 +13,7 @@ export const getWorkingDaysInMonthForSalary = async (date: Date, companyId: stri
   return await getWorkingDaysInMonth(date, companyId);
 };
 
-// Calculate employee salary based on attendance
+// Calculate employee salary based on attendance (simplified)
 export const calculateEmployeeSalary = async (
   monthlySalary: number,
   presentDays: number,
