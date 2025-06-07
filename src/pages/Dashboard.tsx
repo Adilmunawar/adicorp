@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,8 +149,8 @@ export default function DashboardPage() {
         }
       });
 
-      const actualMonthlyExpenses = await employees.reduce(async (totalPromise, emp) => {
-        const total = await totalPromise;
+      let actualMonthlyExpenses = 0;
+      for (const emp of employees) {
         const attendance = attendanceMap.get(emp.id) || { present: 0, shortLeave: 0, leave: 0 };
         const monthlySalary = Number(emp.wage_rate);
         const salaryCalc = await calculateEmployeeSalary(
@@ -159,8 +160,8 @@ export default function DashboardPage() {
           currentMonth,
           userProfile.company_id
         );
-        return total + salaryCalc.calculatedSalary;
-      }, Promise.resolve(0));
+        actualMonthlyExpenses += salaryCalc.calculatedSalary;
+      }
 
       // Calculate average attendance - optimized
       const totalPossibleAttendance = employees.length * workingDaysThisMonth;

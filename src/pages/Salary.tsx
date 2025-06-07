@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -145,34 +146,33 @@ export default function SalaryPage() {
         }
       });
       
-      const salaryData: EmployeeSalaryData[] = await Promise.all(
-        employees.map(async (employee) => {
-          const attendance = attendanceMap.get(employee.id) || {
-            present: 0,
-            shortLeave: 0,
-            leave: 0
-          };
-          
-          const monthlySalary = Number(employee.wage_rate);
-          const salaryCalc = await calculateEmployeeSalary(
-            monthlySalary,
-            attendance.present,
-            attendance.shortLeave,
-            currentMonth,
-            userProfile.company_id
-          );
-          
-          return {
-            employee,
-            presentDays: attendance.present,
-            shortLeaveDays: attendance.shortLeave,
-            leaveDays: attendance.leave,
-            calculatedSalary: salaryCalc.calculatedSalary,
-            actualWorkingDays: salaryCalc.actualWorkingDays,
-            dailyRate: salaryCalc.dailyRate
-          };
-        })
-      );
+      const salaryData: EmployeeSalaryData[] = [];
+      for (const employee of employees) {
+        const attendance = attendanceMap.get(employee.id) || {
+          present: 0,
+          shortLeave: 0,
+          leave: 0
+        };
+        
+        const monthlySalary = Number(employee.wage_rate);
+        const salaryCalc = await calculateEmployeeSalary(
+          monthlySalary,
+          attendance.present,
+          attendance.shortLeave,
+          currentMonth,
+          userProfile.company_id
+        );
+        
+        salaryData.push({
+          employee,
+          presentDays: attendance.present,
+          shortLeaveDays: attendance.shortLeave,
+          leaveDays: attendance.leave,
+          calculatedSalary: salaryCalc.calculatedSalary,
+          actualWorkingDays: salaryCalc.actualWorkingDays,
+          dailyRate: salaryCalc.dailyRate
+        });
+      }
       
       setEmployeeSalaryData(salaryData);
       console.log("Salary - Processed salary data:", salaryData.length);
