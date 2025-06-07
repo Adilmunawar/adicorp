@@ -7,7 +7,7 @@ import { WorkingDayConfig, EventRow } from "@/types/events";
 export const getWorkingDaysConfig = async (companyId: string): Promise<WorkingDayConfig> => {
   try {
     const { data, error } = await supabase
-      .from('working_days_config' as any)
+      .from('working_days_config')
       .select('*')
       .eq('company_id', companyId)
       .maybeSingle();
@@ -65,13 +65,13 @@ export const getEventsForDate = async (date: Date, companyId: string): Promise<E
   try {
     const dateString = format(date, 'yyyy-MM-dd');
     const { data, error } = await supabase
-      .from('events' as any)
+      .from('events')
       .select('*')
       .eq('company_id', companyId)
       .eq('date', dateString);
 
     if (error) throw error;
-    return (data as EventRow[]) || [];
+    return data || [];
   } catch (error) {
     console.error("Error fetching events for date:", error);
     return [];

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,13 +35,13 @@ export default function EventManager() {
   const fetchEvents = async () => {
     try {
       const { data, error } = await supabase
-        .from('events' as any)
+        .from('events')
         .select('*')
         .eq('company_id', userProfile?.company_id)
         .order('date');
 
       if (error) throw error;
-      setEvents((data as EventRow[]) || []);
+      setEvents(data || []);
     } catch (error) {
       console.error("Error fetching events:", error);
     }
@@ -53,7 +52,7 @@ export default function EventManager() {
       if (!userProfile?.company_id || !formData.title.trim()) return;
 
       const { error } = await supabase
-        .from('events' as any)
+        .from('events')
         .insert({
           company_id: userProfile.company_id,
           title: formData.title,
@@ -85,7 +84,7 @@ export default function EventManager() {
   const handleDeleteEvent = async (eventId: string) => {
     try {
       const { error } = await supabase
-        .from('events' as any)
+        .from('events')
         .delete()
         .eq('id', eventId);
 

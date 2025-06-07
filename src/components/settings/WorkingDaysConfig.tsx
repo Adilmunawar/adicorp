@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,7 +33,7 @@ export default function WorkingDaysConfig() {
   const fetchConfig = async () => {
     try {
       const { data, error } = await supabase
-        .from('working_days_config' as any)
+        .from('working_days_config')
         .select('*')
         .eq('company_id', userProfile?.company_id)
         .maybeSingle();
@@ -42,7 +41,7 @@ export default function WorkingDaysConfig() {
       if (error && error.code !== 'PGRST116') throw error;
 
       if (data) {
-        setConfig(data as WorkingDayConfig);
+        setConfig(data);
       } else {
         // Set default config
         setConfig(prev => ({ ...prev, company_id: userProfile?.company_id || '' }));
@@ -58,7 +57,7 @@ export default function WorkingDaysConfig() {
       if (!userProfile?.company_id) return;
 
       const { error } = await supabase
-        .from('working_days_config' as any)
+        .from('working_days_config')
         .upsert({
           company_id: userProfile.company_id,
           monday: config.monday,

@@ -9,7 +9,7 @@ export interface SalaryCalculation {
   calculatedSalary: number;
 }
 
-// Calculate working days in a month using the new working days utility
+// Export the working days function for use in other files
 export const getWorkingDaysInMonthForSalary = async (date: Date, companyId: string): Promise<number> => {
   return await getWorkingDaysInMonth(date, companyId);
 };
