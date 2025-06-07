@@ -26,7 +26,7 @@ import { EmployeeRow } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonthForSalary } from "@/utils/salaryCalculations";
+import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonth } from "@/utils/salaryCalculations";
 
 interface EmployeeSalaryData {
   employee: EmployeeRow;
@@ -45,10 +45,10 @@ export default function SalaryPage() {
   const { toast } = useToast();
   const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("salary-sheet");
-  const [totalWorkingDaysThisMonth, setTotalWorkingDaysThisMonth] = useState(0);
   
   const currentMonth = new Date();
   const currentMonthName = format(currentMonth, "MMMM yyyy");
+  const totalWorkingDaysThisMonth = getWorkingDaysInMonth(currentMonth);
 
   // Memoized calculations for better performance
   const salaryStats = useMemo(() => {
@@ -77,10 +77,6 @@ export default function SalaryPage() {
       
       const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-      
-      // Get total working days for this month
-      const workingDays = await getWorkingDaysInMonthForSalary(currentMonth, userProfile.company_id);
-      setTotalWorkingDaysThisMonth(workingDays);
       
       // Fetch employees and attendance in parallel for better performance
       const [employeesResult, attendanceResult] = await Promise.all([
@@ -146,8 +142,7 @@ export default function SalaryPage() {
         }
       });
       
-      const salaryData: EmployeeSalaryData[] = [];
-      for (const employee of employees) {
+      const salaryData: EmployeeSalaryData[] = employees.map(employee => {
         const attendance = attendanceMap.get(employee.id) || {
           present: 0,
           shortLeave: 0,
@@ -155,15 +150,14 @@ export default function SalaryPage() {
         };
         
         const monthlySalary = Number(employee.wage_rate);
-        const salaryCalc = await calculateEmployeeSalary(
+        const salaryCalc = calculateEmployeeSalary(
           monthlySalary,
           attendance.present,
           attendance.shortLeave,
-          currentMonth,
-          userProfile.company_id
+          currentMonth
         );
         
-        salaryData.push({
+        return {
           employee,
           presentDays: attendance.present,
           shortLeaveDays: attendance.shortLeave,
@@ -171,8 +165,8 @@ export default function SalaryPage() {
           calculatedSalary: salaryCalc.calculatedSalary,
           actualWorkingDays: salaryCalc.actualWorkingDays,
           dailyRate: salaryCalc.dailyRate
-        });
-      }
+        };
+      });
       
       setEmployeeSalaryData(salaryData);
       console.log("Salary - Processed salary data:", salaryData.length);

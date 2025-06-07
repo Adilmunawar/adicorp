@@ -28,7 +28,7 @@ import { EmployeeRow } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
-import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonthForSalary } from "@/utils/salaryCalculations";
+import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonth } from "@/utils/salaryCalculations";
 
 interface AttendanceReport {
   employeeId: string;
@@ -61,9 +61,7 @@ export default function ReportsPage() {
     const averageAttendance = totalEmployees > 0 
       ? attendanceReport.reduce((sum, report) => sum + report.actualWorkingDays, 0) / totalEmployees
       : 0;
-    const totalWorkingDaysThisMonth = attendanceReport.length > 0 
-      ? attendanceReport[0].totalWorkingDaysInMonth 
-      : 0;
+    const totalWorkingDaysThisMonth = getWorkingDaysInMonth(currentMonth);
     
     return {
       totalCalculatedSalary,
@@ -71,7 +69,7 @@ export default function ReportsPage() {
       averageAttendance,
       totalWorkingDaysThisMonth
     };
-  }, [attendanceReport]);
+  }, [attendanceReport, currentMonth]);
 
   const fetchReportsData = useCallback(async () => {
     try {
@@ -153,38 +151,35 @@ export default function ReportsPage() {
         }
       });
       
-      const reportData: AttendanceReport[] = await Promise.all(
-        employeeData.map(async (employee) => {
-          const attendance = attendanceMap.get(employee.id) || {
-            present: 0,
-            shortLeave: 0,
-            leave: 0
-          };
-          
-          const monthlySalary = Number(employee.wage_rate);
-          const salaryCalc = await calculateEmployeeSalary(
-            monthlySalary,
-            attendance.present,
-            attendance.shortLeave,
-            currentMonth,
-            userProfile.company_id
-          );
-          
-          return {
-            employeeId: employee.id,
-            employeeName: employee.name,
-            rank: employee.rank,
-            monthlySalary,
-            presentDays: attendance.present,
-            shortLeaveDays: attendance.shortLeave,
-            leaveDays: attendance.leave,
-            totalWorkingDaysInMonth: salaryCalc.totalWorkingDays,
-            actualWorkingDays: salaryCalc.actualWorkingDays,
-            dailyRate: salaryCalc.dailyRate,
-            calculatedSalary: salaryCalc.calculatedSalary
-          };
-        })
-      );
+      const reportData: AttendanceReport[] = employeeData.map(employee => {
+        const attendance = attendanceMap.get(employee.id) || {
+          present: 0,
+          shortLeave: 0,
+          leave: 0
+        };
+        
+        const monthlySalary = Number(employee.wage_rate);
+        const salaryCalc = calculateEmployeeSalary(
+          monthlySalary,
+          attendance.present,
+          attendance.shortLeave,
+          currentMonth
+        );
+        
+        return {
+          employeeId: employee.id,
+          employeeName: employee.name,
+          rank: employee.rank,
+          monthlySalary,
+          presentDays: attendance.present,
+          shortLeaveDays: attendance.shortLeave,
+          leaveDays: attendance.leave,
+          totalWorkingDaysInMonth: salaryCalc.totalWorkingDays,
+          actualWorkingDays: salaryCalc.actualWorkingDays,
+          dailyRate: salaryCalc.dailyRate,
+          calculatedSalary: salaryCalc.calculatedSalary
+        };
+      });
       
       setAttendanceReport(reportData);
       console.log("Reports - Processed attendance report:", reportData.length, "employees");

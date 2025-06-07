@@ -112,44 +112,6 @@ export type Database = {
           },
         ]
       }
-      events: {
-        Row: {
-          company_id: string
-          created_at: string
-          date: string
-          description: string | null
-          id: string
-          title: string
-          type: string
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          date: string
-          description?: string | null
-          id?: string
-          title: string
-          type: string
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          date?: string
-          description?: string | null
-          id?: string
-          title?: string
-          type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "events_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           company_id: string | null
@@ -180,53 +142,6 @@ export type Database = {
             foreignKeyName: "profiles_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      working_days_config: {
-        Row: {
-          company_id: string
-          created_at: string
-          friday: boolean
-          monday: boolean
-          saturday: boolean
-          sunday: boolean
-          thursday: boolean
-          tuesday: boolean
-          updated_at: string
-          wednesday: boolean
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          friday?: boolean
-          monday?: boolean
-          saturday?: boolean
-          sunday?: boolean
-          thursday?: boolean
-          tuesday?: boolean
-          updated_at?: string
-          wednesday?: boolean
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          friday?: boolean
-          monday?: boolean
-          saturday?: boolean
-          sunday?: boolean
-          thursday?: boolean
-          tuesday?: boolean
-          updated_at?: string
-          wednesday?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "working_days_config_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: true
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
