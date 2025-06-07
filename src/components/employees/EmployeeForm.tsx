@@ -60,7 +60,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const { user, session, userProfile } = useAuth();
-  
+
   const form = useForm<FormValues>({
     resolver: zodResolver(employeeSchema),
     defaultValues: {
@@ -72,7 +72,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   });
 
   const hasCompany = !!userProfile?.company_id;
-  
+
   useEffect(() => {
     if (!isOpen) {
       form.reset({
@@ -83,7 +83,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       });
       return;
     }
-    
+
     if (isOpen && isEditing && employeeId) {
       const fetchEmployee = async () => {
         try {
@@ -99,20 +99,17 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             return;
           }
 
-          console.log("Fetching employee with ID:", employeeId, "for company:", userProfile?.company_id);
-          
           const { data, error } = await supabase
             .from('employees')
             .select('*')
             .eq('id', employeeId)
             .eq('company_id', userProfile?.company_id)
             .single();
-            
+
           if (error) {
-            console.error("Error fetching employee:", error);
             throw error;
           }
-          
+
           if (data) {
             form.reset({
               name: data.name,
@@ -122,7 +119,6 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             });
           }
         } catch (error) {
-          console.error("Error fetching employee:", error);
           toast({
             title: "Failed to load employee data",
             description: "Please try again.",
@@ -133,15 +129,15 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           setIsFetching(false);
         }
       };
-      
+
       fetchEmployee();
     }
   }, [isOpen, isEditing, employeeId, toast, onClose, session, user, form, userProfile?.company_id]);
-  
+
   const handleSubmit = async (values: FormValues) => {
     try {
       setIsLoading(true);
-      
+
       if (!session || !user) {
         toast({
           title: "Authentication required",
@@ -150,7 +146,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         });
         return;
       }
-      
+
       if (!userProfile?.company_id) {
         toast({
           title: "Company ID not found",
@@ -159,11 +155,8 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         });
         return;
       }
-      
-      console.log("Submitting employee form with company_id:", userProfile.company_id);
-      
+
       if (isEditing && employeeId) {
-        console.log("Updating employee:", employeeId);
         const { error } = await supabase
           .from('employees')
           .update({
@@ -174,17 +167,13 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
           })
           .eq('id', employeeId)
           .eq('company_id', userProfile.company_id);
-          
-        if (error) {
-          console.error("Error updating employee:", error);
-          throw error;
-        }
-        
+
+        if (error) throw error;
+
         sonnerToast.success("Employee updated", {
           description: "Employee information has been updated successfully."
         });
       } else {
-        console.log("Creating new employee with company_id:", userProfile.company_id);
         const { error } = await supabase
           .from('employees')
           .insert({
@@ -194,20 +183,16 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             status: values.status,
             company_id: userProfile.company_id
           });
-          
-        if (error) {
-          console.error("Error creating employee:", error);
-          throw error;
-        }
-        
+
+        if (error) throw error;
+
         sonnerToast.success("Employee added", {
           description: "New employee has been added successfully."
         });
       }
-      
+
       onClose();
     } catch (error: any) {
-      console.error("Error saving employee:", error);
       toast({
         title: "Failed to save employee",
         description: error.message || "Please try again.",
@@ -220,7 +205,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
 
   const renderCompanySetupNeeded = () => (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-[100]">
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] max-h-[90vh] overflow-y-auto">
         <div className="text-center py-6">
           <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Company Setup Required</h2>
@@ -241,35 +226,36 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
       </DialogContent>
     </Dialog>
   );
-  
+
   if (!hasCompany) {
     return renderCompanySetupNeeded();
   }
-if (isFetching) {
+
+  if (isFetching) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-return (
-  <Dialog open={isOpen} onOpenChange={onClose}>
-    <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] max-h-[90vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle>
+        <DialogHeader>
+          <DialogTitle>
             {isEditing ? "Edit Employee" : "Add New Employee"}
-        </DialogTitle>
-        <DialogDescription>
-          {isEditing 
-            ? "Update employee information below"
-            : "Enter employee details to add them to your team"}
-        </DialogDescription>
-      </DialogHeader>
+          </DialogTitle>
+          <DialogDescription>
+            {isEditing 
+              ? "Update employee information below"
+              : "Enter employee details to add them to your team"}
+          </DialogDescription>
+        </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
@@ -289,7 +275,6 @@ return (
                 </FormItem>
               )}
             />
-            
             <FormField
               control={form.control}
               name="rank"
@@ -315,7 +300,6 @@ return (
                 </FormItem>
               )}
             />
-            
             <FormField
               control={form.control}
               name="monthly_salary"
@@ -334,7 +318,6 @@ return (
                 </FormItem>
               )}
             />
-            
             <FormField
               control={form.control}
               name="status"
@@ -359,7 +342,6 @@ return (
                 </FormItem>
               )}
             />
-            
             <DialogFooter>
               <Button 
                 type="button" 
