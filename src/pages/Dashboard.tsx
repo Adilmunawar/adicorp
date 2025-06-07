@@ -15,7 +15,7 @@ import { EmployeeRow } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonth } from "@/utils/salaryCalculations";
+import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonthForSalary } from "@/utils/salaryCalculations";
 import { Button } from "@/components/ui/button";
 
 interface DashboardStats {
@@ -124,6 +124,9 @@ export default function DashboardPage() {
         return total + Number(emp.wage_rate);
       }, 0);
 
+      // Get working days for this month
+      const workingDaysThisMonth = await getWorkingDaysInMonthForSalary(currentMonth, userProfile.company_id);
+
       // Calculate actual expenses based on attendance - optimized
       const attendanceMap = new Map();
       monthAttendance.forEach(record => {
@@ -146,20 +149,21 @@ export default function DashboardPage() {
         }
       });
 
-      const actualMonthlyExpenses = employees.reduce((total, emp) => {
+      let actualMonthlyExpenses = 0;
+      for (const emp of employees) {
         const attendance = attendanceMap.get(emp.id) || { present: 0, shortLeave: 0, leave: 0 };
         const monthlySalary = Number(emp.wage_rate);
-        const salaryCalc = calculateEmployeeSalary(
+        const salaryCalc = await calculateEmployeeSalary(
           monthlySalary,
           attendance.present,
           attendance.shortLeave,
-          currentMonth
+          currentMonth,
+          userProfile.company_id
         );
-        return total + salaryCalc.calculatedSalary;
-      }, 0);
+        actualMonthlyExpenses += salaryCalc.calculatedSalary;
+      }
 
       // Calculate average attendance - optimized
-      const workingDaysThisMonth = getWorkingDaysInMonth(currentMonth);
       const totalPossibleAttendance = employees.length * workingDaysThisMonth;
       const presentCount = monthAttendance.filter(att => att.status === 'present').length;
       const shortLeaveCount = monthAttendance.filter(att => att.status === 'short_leave').length;
