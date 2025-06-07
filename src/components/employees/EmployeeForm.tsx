@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,7 +23,14 @@ import { toast as sonnerToast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
 interface EmployeeFormProps {
@@ -106,9 +113,7 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
             .eq('company_id', userProfile?.company_id)
             .single();
 
-          if (error) {
-            throw error;
-          }
+          if (error) throw error;
 
           if (data) {
             form.reset({
@@ -205,25 +210,27 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
 
   const renderCompanySetupNeeded = () => (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] max-h-[90vh] overflow-y-auto">
-        <div className="text-center py-6">
-          <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Company Setup Required</h2>
-          <p className="text-white/70 mb-4">
-            You need to set up your company information before you can add employees.
-          </p>
-          <Button 
-            variant="default"
-            className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-            onClick={() => {
-              onClose();
-              window.location.href = '/settings';
-            }}
-          >
-            Go to Settings
-          </Button>
-        </div>
-      </DialogContent>
+      <div className="adicorp-modal-override">
+        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md w-full max-w-lg rounded-xl shadow-lg max-h-[90vh] overflow-y-auto p-0">
+          <div className="text-center py-6">
+            <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Company Setup Required</h2>
+            <p className="text-white/70 mb-4">
+              You need to set up your company information before you can add employees.
+            </p>
+            <Button 
+              variant="default"
+              className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+              onClick={() => {
+                onClose();
+                window.location.href = '/settings';
+              }}
+            >
+              Go to Settings
+            </Button>
+          </div>
+        </DialogContent>
+      </div>
     </Dialog>
   );
 
@@ -234,142 +241,149 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   if (isFetching) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] max-h-[90vh] overflow-y-auto">
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
-          </div>
-        </DialogContent>
+        <div className="adicorp-modal-override">
+          <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md w-full max-w-lg rounded-xl shadow-lg max-h-[90vh] overflow-y-auto p-0 flex items-center justify-center">
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+            </div>
+          </DialogContent>
+        </div>
       </Dialog>
     );
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {isEditing ? "Edit Employee" : "Add New Employee"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing 
-              ? "Update employee information below"
-              : "Enter employee details to add them to your team"}
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      className="bg-adicorp-dark/60 border-white/10"
-                      placeholder="e.g. John Smith"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="rank"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rank/Position</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange}
-                    value={field.value}
+      <div className="adicorp-modal-override">
+        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md w-full max-w-lg rounded-xl shadow-lg max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>
+              {isEditing ? "Edit Employee" : "Add New Employee"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditing
+                ? "Update employee information below"
+                : "Enter employee details to add them to your team"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6 pt-2">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          className="bg-adicorp-dark/60 border-white/10"
+                          placeholder="e.g. John Smith"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="rank"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rank/Position</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
+                            <SelectValue placeholder="Select a position" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-adicorp-dark-light border-white/10 z-[110]">
+                          {ranks.map((rank) => (
+                            <SelectItem key={rank} value={rank}>{rank}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="monthly_salary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Monthly Salary (PKR)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          className="bg-adicorp-dark/60 border-white/10"
+                          placeholder="e.g. 45000"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-adicorp-dark-light border-white/10 z-[110]">
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={isLoading}
+                    className="border-white/10 hover:bg-adicorp-dark"
                   >
-                    <FormControl>
-                      <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
-                        <SelectValue placeholder="Select a position" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-adicorp-dark-light border-white/10 z-[110]">
-                      {ranks.map((rank) => (
-                        <SelectItem key={rank} value={rank}>{rank}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="monthly_salary"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Monthly Salary (PKR)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      {...field}
-                      className="bg-adicorp-dark/60 border-white/10"
-                      placeholder="e.g. 45000"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange}
-                    value={field.value}
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isLoading}
+                    className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
                   >
-                    <FormControl>
-                      <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="bg-adicorp-dark-light border-white/10 z-[110]">
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose}
-                disabled={isLoading}
-                className="border-white/10 hover:bg-adicorp-dark"
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit"
-                disabled={isLoading}
-                className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isEditing ? "Updating..." : "Adding..."}
-                  </>
-                ) : (
-                  isEditing ? "Update Employee" : "Add Employee"
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {isEditing ? "Updating..." : "Adding..."}
+                      </>
+                    ) : (
+                      isEditing ? "Update Employee" : "Add Employee"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </div>
+        </DialogContent>
+      </div>
     </Dialog>
   );
 }
