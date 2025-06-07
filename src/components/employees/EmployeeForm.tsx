@@ -245,10 +245,10 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   if (!hasCompany) {
     return renderCompanySetupNeeded();
   }
-  if (isFetching) {
+if (isFetching) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-8 left-1/2 -translate-x-1/2 z-[100]">
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] max-h-[90vh] overflow-y-auto">
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
         </div>
@@ -259,18 +259,17 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
 
 return (
   <Dialog open={isOpen} onOpenChange={onClose}>
-    <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-8 left-1/2 -translate-x-1/2 z-[100] max-h-[90vh] overflow-y-auto">
+    <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>
             {isEditing ? "Edit Employee" : "Add New Employee"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing 
-              ? "Update employee information below"
-              : "Enter employee details to add them to your team"}
-          </DialogDescription>
-        </DialogHeader>
-        
+        </DialogTitle>
+        <DialogDescription>
+          {isEditing 
+            ? "Update employee information below"
+            : "Enter employee details to add them to your team"}
+        </DialogDescription>
+      </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
