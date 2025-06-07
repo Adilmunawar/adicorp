@@ -41,7 +41,8 @@ export default function EventManager() {
         .order('date');
 
       if (error) throw error;
-      setEvents(data || []);
+      // Type assertion since we know the database only contains valid event types
+      setEvents((data || []) as EventRow[]);
     } catch (error) {
       console.error("Error fetching events:", error);
     }

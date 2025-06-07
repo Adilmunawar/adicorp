@@ -71,7 +71,8 @@ export const getEventsForDate = async (date: Date, companyId: string): Promise<E
       .eq('date', dateString);
 
     if (error) throw error;
-    return data || [];
+    // Type assertion since we know the database only contains valid event types
+    return (data || []) as EventRow[];
   } catch (error) {
     console.error("Error fetching events for date:", error);
     return [];
