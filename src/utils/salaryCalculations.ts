@@ -1,5 +1,6 @@
 
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
+import { getWorkingDaysInMonth } from "./workingDays";
 
 export interface SalaryCalculation {
   totalWorkingDays: number;
@@ -8,27 +9,20 @@ export interface SalaryCalculation {
   calculatedSalary: number;
 }
 
-// Calculate working days in a month (excluding Sundays)
-export const getWorkingDaysInMonth = (date: Date): number => {
-  const start = startOfMonth(date);
-  const end = endOfMonth(date);
-  
-  const allDays = eachDayOfInterval({ start, end });
-  
-  // Filter out Sundays (getDay() returns 0 for Sunday)
-  const workingDays = allDays.filter(day => getDay(day) !== 0);
-  
-  return workingDays.length;
+// Calculate working days in a month using the new working days utility
+export const getWorkingDaysInMonthForSalary = async (date: Date, companyId: string): Promise<number> => {
+  return await getWorkingDaysInMonth(date, companyId);
 };
 
 // Calculate employee salary based on attendance
-export const calculateEmployeeSalary = (
+export const calculateEmployeeSalary = async (
   monthlySalary: number,
   presentDays: number,
   shortLeaveDays: number,
-  currentMonth: Date
-): SalaryCalculation => {
-  const totalWorkingDays = getWorkingDaysInMonth(currentMonth);
+  currentMonth: Date,
+  companyId: string
+): Promise<SalaryCalculation> => {
+  const totalWorkingDays = await getWorkingDaysInMonthForSalary(currentMonth, companyId);
   const dailyRate = monthlySalary / totalWorkingDays;
   
   // Calculate actual working days (short leave counts as 0.5 days)
