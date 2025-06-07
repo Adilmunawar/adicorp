@@ -245,24 +245,23 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
   if (!hasCompany) {
     return renderCompanySetupNeeded();
   }
-  
   if (isFetching) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-[100]">
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-[100] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
+      <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-8 left-1/2 -translate-x-1/2 z-[100]">
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+return (
+  <Dialog open={isOpen} onOpenChange={onClose}>
+    <DialogContent className="glass-card bg-adicorp-dark-light border-white/10 sm:max-w-md fixed top-8 left-1/2 -translate-x-1/2 z-[100] max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>
             {isEditing ? "Edit Employee" : "Add New Employee"}
           </DialogTitle>
           <DialogDescription>
