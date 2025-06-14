@@ -70,8 +70,9 @@ export default function ReportsPage() {
         setStatsLoading(false);
         return;
       }
+      // FIX: format currentMonth as string for target_month param
       const { data, error } = await supabase.rpc("get_monthly_salary_stats", {
-        target_month: currentMonth,
+        target_month: format(currentMonth, "yyyy-MM-dd"),
         in_company_id: userProfile.company_id,
       });
       if (error) throw error;
@@ -89,7 +90,7 @@ export default function ReportsPage() {
       setStatsLoading(false);
     }
   }, [userProfile?.company_id, currentMonth]);
-
+  
   // Memoized calculations for better performance
   const reportStats = useMemo(() => {
     const totalCalculatedSalary = attendanceReport.reduce((sum, report) => sum + report.calculatedSalary, 0);
