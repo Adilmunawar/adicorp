@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2 } from "lucide-react";
-import { formatCurrency } from "@/utils/salaryCalculations";
+import { formatCurrencySync } from "@/utils/salaryCalculations";
 
 interface EmployeeSalaryData {
   employeeId: string;
@@ -86,11 +86,11 @@ export default function PayslipsGrid({
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-white/60">Monthly Salary:</span>
-                      <span>{formatCurrency(data.monthlySalary)}</span>
+                      <span>{formatCurrencySync(data.monthlySalary)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/60">Daily Rate:</span>
-                      <span>{formatCurrency(data.dailyRate)}</span>
+                      <span>{formatCurrencySync(data.dailyRate)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/60">Working Days:</span>
@@ -107,7 +107,7 @@ export default function PayslipsGrid({
                     <div className="flex justify-between font-bold pt-2 border-t border-white/10">
                       <span>Calculated Salary:</span>
                       <span className="text-green-400">
-                        {formatCurrency(data.calculatedSalary)}
+                        {formatCurrencySync(data.calculatedSalary)}
                       </span>
                     </div>
                   </div>

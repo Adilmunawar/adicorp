@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Download, Loader2 } from "lucide-react";
-import { formatCurrency } from "@/utils/salaryCalculations";
+import { formatCurrencySync } from "@/utils/salaryCalculations";
 
 interface EmployeeSalaryData {
   employeeId: string;
@@ -91,11 +91,11 @@ export default function SalarySheet({
                   >
                     <TableCell className="font-medium">{data.employeeName}</TableCell>
                     <TableCell>{data.rank}</TableCell>
-                    <TableCell>{formatCurrency(data.monthlySalary)}</TableCell>
-                    <TableCell>{formatCurrency(data.dailyRate)}</TableCell>
+                    <TableCell>{formatCurrencySync(data.monthlySalary)}</TableCell>
+                    <TableCell>{formatCurrencySync(data.dailyRate)}</TableCell>
                     <TableCell>{data.actualWorkingDays} / {totalWorkingDaysThisMonth}</TableCell>
                     <TableCell className="font-bold text-green-400">
-                      {formatCurrency(data.calculatedSalary)}
+                      {formatCurrencySync(data.calculatedSalary)}
                     </TableCell>
                     <TableCell>
                       <Badge className={

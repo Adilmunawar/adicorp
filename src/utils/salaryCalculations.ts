@@ -1,6 +1,6 @@
-
 import { dataIntegrationService } from "@/services/dataIntegrationService";
 import { getDailyRateDivisor } from "@/utils/workingDays";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface SalaryData {
   employee_id: string;
@@ -15,13 +15,190 @@ export interface SalaryData {
   working_days: number;
 }
 
-export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+const getCurrencySettings = async (companyId: string): Promise<{ code: string; locale: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('currency')
+      .eq('id', companyId)
+      .single();
+
+    if (error || !data?.currency) {
+      // Fallback to localStorage or default
+      const storedCurrency = localStorage.getItem('app_currency') || 'USD';
+      return {
+        code: storedCurrency,
+        locale: storedCurrency === 'USD' ? 'en-US' : 'en-US'
+      };
+    }
+
+    // Map currency codes to locales
+    const currencyLocaleMap: Record<string, string> = {
+      'USD': 'en-US',
+      'EUR': 'de-DE',
+      'GBP': 'en-GB',
+      'JPY': 'ja-JP',
+      'PKR': 'ur-PK',
+      'INR': 'hi-IN',
+      'CAD': 'en-CA',
+      'AUD': 'en-AU',
+      'CHF': 'de-CH',
+      'CNY': 'zh-CN',
+      'SGD': 'en-SG',
+      'HKD': 'en-HK',
+      'SEK': 'sv-SE',
+      'NOK': 'nb-NO',
+      'DKK': 'da-DK',
+      'PLN': 'pl-PL',
+      'CZK': 'cs-CZ',
+      'HUF': 'hu-HU',
+      'RUB': 'ru-RU',
+      'BRL': 'pt-BR',
+      'MXN': 'es-MX',
+      'ARS': 'es-AR',
+      'CLP': 'es-CL',
+      'ZAR': 'en-ZA',
+      'TRY': 'tr-TR',
+      'KRW': 'ko-KR',
+      'THB': 'th-TH',
+      'MYR': 'ms-MY',
+      'IDR': 'id-ID',
+      'PHP': 'fil-PH',
+      'VND': 'vi-VN',
+      'EGP': 'ar-EG',
+      'SAR': 'ar-SA',
+      'AED': 'ar-AE',
+      'QAR': 'ar-QA',
+      'KWD': 'ar-KW',
+      'BHD': 'ar-BH',
+      'OMR': 'ar-OM',
+      'JOD': 'ar-JO',
+      'LBP': 'ar-LB',
+      'ILS': 'he-IL',
+      'NGN': 'en-NG',
+      'GHS': 'en-GH',
+      'KES': 'en-KE',
+      'UGX': 'en-UG',
+      'TZS': 'en-TZ',
+      'ETB': 'am-ET',
+      'MAD': 'ar-MA',
+      'TND': 'ar-TN',
+      'DZD': 'ar-DZ',
+    };
+
+    return {
+      code: data.currency,
+      locale: currencyLocaleMap[data.currency] || 'en-US'
+    };
+  } catch (error) {
+    console.error('Error fetching currency settings:', error);
+    return { code: 'USD', locale: 'en-US' };
+  }
+};
+
+export const formatCurrency = async (amount: number, companyId?: string): Promise<string> => {
+  try {
+    let currencySettings;
+    
+    if (companyId) {
+      currencySettings = await getCurrencySettings(companyId);
+    } else {
+      // Fallback for when company ID is not available
+      const storedCurrency = localStorage.getItem('app_currency') || 'USD';
+      currencySettings = { code: storedCurrency, locale: 'en-US' };
+    }
+
+    return new Intl.NumberFormat(currencySettings.locale, {
+      style: 'currency',
+      currency: currencySettings.code,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch (error) {
+    console.error('Error formatting currency:', error);
+    // Fallback to USD
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+};
+
+// Simple synchronous version for immediate display
+export const formatCurrencySync = (amount: number): string => {
+  const storedCurrency = localStorage.getItem('app_currency') || 'USD';
+  
+  const currencyLocaleMap: Record<string, string> = {
+    'USD': 'en-US',
+    'EUR': 'de-DE',
+    'GBP': 'en-GB',
+    'JPY': 'ja-JP',
+    'PKR': 'ur-PK',
+    'INR': 'hi-IN',
+    'CAD': 'en-CA',
+    'AUD': 'en-AU',
+    'CHF': 'de-CH',
+    'CNY': 'zh-CN',
+    'SGD': 'en-SG',
+    'HKD': 'en-HK',
+    'SEK': 'sv-SE',
+    'NOK': 'nb-NO',
+    'DKK': 'da-DK',
+    'PLN': 'pl-PL',
+    'CZK': 'cs-CZ',
+    'HUF': 'hu-HU',
+    'RUB': 'ru-RU',
+    'BRL': 'pt-BR',
+    'MXN': 'es-MX',
+    'ARS': 'es-AR',
+    'CLP': 'es-CL',
+    'ZAR': 'en-ZA',
+    'TRY': 'tr-TR',
+    'KRW': 'ko-KR',
+    'THB': 'th-TH',
+    'MYR': 'ms-MY',
+    'IDR': 'id-ID',
+    'PHP': 'fil-PH',
+    'VND': 'vi-VN',
+    'EGP': 'ar-EG',
+    'SAR': 'ar-SA',
+    'AED': 'ar-AE',
+    'QAR': 'ar-QA',
+    'KWD': 'ar-KW',
+    'BHD': 'ar-BH',
+    'OMR': 'ar-OM',
+    'JOD': 'ar-JO',
+    'LBP': 'ar-LB',
+    'ILS': 'he-IL',
+    'NGN': 'en-NG',
+    'GHS': 'en-GH',
+    'KES': 'en-KE',
+    'UGX': 'en-UG',
+    'TZS': 'en-TZ',
+    'ETB': 'am-ET',
+    'MAD': 'ar-MA',
+    'TND': 'ar-TN',
+    'DZD': 'ar-DZ',
+  };
+
+  try {
+    return new Intl.NumberFormat(currencyLocaleMap[storedCurrency] || 'en-US', {
+      style: 'currency',
+      currency: storedCurrency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch (error) {
+    console.error('Error formatting currency:', error);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
 };
 
 export const calculateMonthlySalaries = async (

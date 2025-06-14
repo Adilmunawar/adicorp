@@ -2,6 +2,7 @@
 import Dashboard from "@/components/layout/Dashboard";
 import CompanySetupModal from "@/components/company/CompanySetupModal";
 import BackupManager from "@/components/backup/BackupManager";
+import CurrencySettings from "@/components/settings/CurrencySettings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
@@ -66,6 +67,9 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Currency Settings Section */}
+        <CurrencySettings />
 
         {/* User Information Section */}
         <Card className="glass-card">

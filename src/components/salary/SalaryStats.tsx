@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CircleDollarSign, Calendar, Briefcase, Loader2 } from "lucide-react";
-import { formatCurrency } from "@/utils/salaryCalculations";
+import { formatCurrencySync } from "@/utils/salaryCalculations";
 
 interface SalaryStats {
   totalBudgetSalary: number;
@@ -32,7 +32,7 @@ export default function SalaryStats({ stats, loading }: SalaryStatsProps) {
               <div className="flex items-center">
                 <CircleDollarSign className="h-5 w-5 mr-2 text-green-400" />
                 <span className="text-2xl font-bold">
-                  {formatCurrency(stats.totalBudgetSalary)}
+                  {formatCurrencySync(stats.totalBudgetSalary)}
                 </span>
               </div>
               <p className="text-xs text-white/60 mt-1">
@@ -57,7 +57,7 @@ export default function SalaryStats({ stats, loading }: SalaryStatsProps) {
               <div className="flex items-center">
                 <Calendar className="h-5 w-5 mr-2 text-blue-400" />
                 <span className="text-2xl font-bold">
-                  {formatCurrency(stats.totalCalculatedSalary)}
+                  {formatCurrencySync(stats.totalCalculatedSalary)}
                 </span>
               </div>
               <p className="text-xs text-white/60 mt-1">
@@ -82,7 +82,7 @@ export default function SalaryStats({ stats, loading }: SalaryStatsProps) {
               <div className="flex items-center">
                 <Briefcase className="h-5 w-5 mr-2 text-purple-400" />
                 <span className="text-2xl font-bold">
-                  {formatCurrency(stats.averageDailyRate)}
+                  {formatCurrencySync(stats.averageDailyRate)}
                 </span>
               </div>
               <p className="text-xs text-white/60 mt-1">
