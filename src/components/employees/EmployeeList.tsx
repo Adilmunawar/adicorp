@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,7 +49,12 @@ interface Employee {
   user_id?: string;
 }
 
-export default function EmployeeList() {
+interface EmployeeListProps {
+  onAddEmployee?: () => void;
+  onEditEmployee?: (id: string) => void;
+}
+
+export default function EmployeeList({ onAddEmployee, onEditEmployee }: EmployeeListProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -101,13 +105,21 @@ export default function EmployeeList() {
   };
 
   const handleAddEmployee = () => {
-    setEditingEmployee(null);
-    setShowForm(true);
+    if (onAddEmployee) {
+      onAddEmployee();
+    } else {
+      setEditingEmployee(null);
+      setShowForm(true);
+    }
   };
 
   const handleEditEmployee = (employee: Employee) => {
-    setEditingEmployee(employee);
-    setShowForm(true);
+    if (onEditEmployee) {
+      onEditEmployee(employee.id);
+    } else {
+      setEditingEmployee(employee);
+      setShowForm(true);
+    }
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
@@ -403,20 +415,20 @@ export default function EmployeeList() {
       {/* Employee Form Modal */}
       {showForm && (
         <EmployeeForm
-          employee={editingEmployee}
-          onSuccess={handleFormSuccess}
-          onCancel={() => {
+          isOpen={showForm}
+          onClose={() => {
             setShowForm(false);
             setEditingEmployee(null);
           }}
+          employeeId={editingEmployee?.id}
         />
       )}
 
       {/* Import/Export Modal */}
       {showImportExport && (
         <EmployeeImportExport
-          onClose={() => setShowImportExport(false)}
-          onDataChange={fetchEmployees}
+          onImportComplete={() => setShowImportExport(false)}
+          employees={employees}
         />
       )}
     </div>
