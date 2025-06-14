@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,7 +73,14 @@ export default function AdvancedEventManager() {
         .order('date', { ascending: true });
 
       if (error) throw error;
-      setEvents(data || []);
+      
+      // Type cast the data to ensure proper typing
+      const typedEvents = (data || []).map(event => ({
+        ...event,
+        type: event.type as Event['type']
+      }));
+      
+      setEvents(typedEvents);
     } catch (error) {
       console.error("Error fetching events:", error);
     }

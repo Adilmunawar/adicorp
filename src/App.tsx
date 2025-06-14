@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +13,8 @@ import ReportsPage from "./pages/Reports";
 import SettingsPage from "./pages/Settings";
 import AuthPage from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import EventsPage from "./pages/Events";
+import WorkingDaysPage from "./pages/WorkingDays";
 import { AuthProvider } from "./context/AuthContext";
 import { PrivateRoute } from "./components/layout/PrivateRoute";
 import CompanySetupModal from "./components/company/CompanySetupModal";
@@ -33,81 +36,86 @@ function App() {
   }, []);
 
   return (
-    <QueryClient client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route 
-              path="/dashboard" 
-              element={
-                <PrivateRoute>
-                  <DashboardPage />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/employees" 
-              element={
-                <PrivateRoute>
-                  <EmployeesPage />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/attendance" 
-              element={
-                <PrivateRoute>
-                  <AttendancePage />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/salary" 
-              element={
-                <PrivateRoute>
-                  <SalaryPage />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/reports" 
-              element={
-                <PrivateRoute>
-                  <ReportsPage />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/events" 
-              element={
-                <PrivateRoute>
-                  <EventsPage />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/working-days" 
-              element={
-                <PrivateRoute>
-                  <WorkingDaysPage />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/settings" 
-              element={
-                <PrivateRoute>
-                  <SettingsPage />
-                </PrivateRoute>
-              } 
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClient>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <CompanySetupModal />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <PrivateRoute>
+                    <DashboardPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/employees" 
+                element={
+                  <PrivateRoute>
+                    <EmployeesPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/attendance" 
+                element={
+                  <PrivateRoute>
+                    <AttendancePage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/salary" 
+                element={
+                  <PrivateRoute>
+                    <SalaryPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/reports" 
+                element={
+                  <PrivateRoute>
+                    <ReportsPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/events" 
+                element={
+                  <PrivateRoute>
+                    <EventsPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/working-days" 
+                element={
+                  <PrivateRoute>
+                    <WorkingDaysPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <PrivateRoute>
+                    <SettingsPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
