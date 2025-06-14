@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { calculateEmployeeSalary, getWorkingDaysInMonthForSalary } from "@/utils/salaryCalculations";
 
 interface DashboardStats {
   totalEmployees: number;
@@ -77,27 +77,26 @@ export default function DashboardPage() {
       console.log("Dashboard - Fetching data for company:", userProfile.company_id);
       
       // Simplified queries for better performance
-      const [employeesResult, todayAttendanceResult] = await Promise.all([
+      const [employeesResult, todayAttendanceResult, monthAttendanceResult] = await Promise.all([
         supabase
           .from('employees')
-          .select('id, name, wage_rate')
+          .select('id, name, wage_rate, rank')
           .eq('company_id', userProfile.company_id)
           .eq('status', 'active'),
         supabase
           .from('attendance')
           .select('employee_id, status')
-          .eq('date', today)
+          .eq('date', today),
+        supabase
+          .from('attendance')
+          .select('employee_id, status, date')
+          .gte('date', monthStart)
+          .lte('date', monthEnd)
       ]);
 
-      if (employeesResult.error) {
-        console.error("Dashboard - Error fetching employees:", employeesResult.error);
-        throw new Error(`Failed to fetch employees: ${employeesResult.error.message}`);
-      }
-
-      if (todayAttendanceResult.error) {
-        console.error("Dashboard - Error fetching today's attendance:", todayAttendanceResult.error);
-        throw new Error(`Failed to fetch today's attendance: ${todayAttendanceResult.error.message}`);
-      }
+      if (employeesResult.error) throw new Error(`Failed to fetch employees: ${employeesResult.error.message}`);
+      if (todayAttendanceResult.error) throw new Error(`Failed to fetch today's attendance: ${todayAttendanceResult.error.message}`);
+      if (monthAttendanceResult.error && monthAttendanceResult.error.code !== 'PGRST116') throw new Error(`Failed to fetch monthly attendance: ${monthAttendanceResult.error.message}`);
 
       const employees = employeesResult.data || [];
       const employeeIds = new Set(employees.map(emp => emp.id));
@@ -106,23 +105,68 @@ export default function DashboardPage() {
       const todayAttendance = (todayAttendanceResult.data || [])
         .filter(att => employeeIds.has(att.employee_id));
 
-      // Simplified calculations without complex attendance analysis
-      const monthlyExpectedExpenses = employees.reduce((total, emp) => {
-        return total + Number(emp.wage_rate || 0);
-      }, 0);
+      // --- Real Actual Expenses calculation below ---
+
+      // All attendance in this month for active employees
+      const attendanceData = monthAttendanceResult.data || [];
+      // Make a map: employeeId -> attendance records (for this month)
+      const attendanceMap: Record<string, {present: number, shortLeave: number, leave: number}> = {};
+      for (const emp of employees) {
+        attendanceMap[emp.id] = {present: 0, shortLeave: 0, leave: 0};
+      }
+      attendanceData.forEach(record => {
+        if (!attendanceMap[record.employee_id]) return;
+        switch (record.status) {
+          case "present":
+            attendanceMap[record.employee_id].present += 1;
+            break;
+          case "short_leave":
+            attendanceMap[record.employee_id].shortLeave += 1;
+            break;
+          case "leave":
+            attendanceMap[record.employee_id].leave += 1;
+            break;
+        }
+      });
+
+      // Calculate working days for current month
+      const workingDaysThisMonth = await getWorkingDaysInMonthForSalary(currentMonth, userProfile.company_id);
+
+      // Compute attendance-based actual salary for each employee
+      let actualMonthlyExpenses = 0;
+      let monthlyExpectedExpenses = 0;
+      let totalAttendance = 0;
+
+      for (const emp of employees) {
+        const monthlySalary = Number(emp.wage_rate || 0);
+        const {present, shortLeave} = attendanceMap[emp.id] || {present: 0, shortLeave: 0};
+        // Calculate salary based on attendance
+        const salaryCalc = await calculateEmployeeSalary(
+          monthlySalary,
+          present,
+          shortLeave,
+          currentMonth,
+          userProfile.company_id,
+        );
+        actualMonthlyExpenses += salaryCalc.calculatedSalary;
+        monthlyExpectedExpenses += monthlySalary;
+        totalAttendance += present + (shortLeave * 0.5);
+      }
 
       const todayPresentCount = todayAttendance.filter(att => att.status === 'present').length;
 
-      // Simplified actual expenses calculation (70-90% of expected)
-      const actualMonthlyExpenses = monthlyExpectedExpenses * 0.8;
+      // Avoid division by zero; averageAttendance in percent
+      const averageAttendance = employees.length > 0 && workingDaysThisMonth > 0
+        ? (totalAttendance / (employees.length * workingDaysThisMonth)) * 100
+        : 0;
 
       const newStats: DashboardStats = {
         totalEmployees: employees.length,
         totalAttendanceToday: todayPresentCount,
         monthlyExpectedExpenses,
         actualMonthlyExpenses,
-        averageAttendance: 85, // Simplified average
-        workingDaysThisMonth: 22 // Standard working days
+        averageAttendance,
+        workingDaysThisMonth
       };
 
       setStats(newStats);
@@ -140,7 +184,7 @@ export default function DashboardPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userProfile?.company_id, today, toast]);
+  }, [userProfile?.company_id, today, toast, currentMonth, monthStart, monthEnd]);
 
   useEffect(() => {
     if (userProfile?.company_id) {
