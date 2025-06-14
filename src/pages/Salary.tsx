@@ -41,6 +41,12 @@ export default function SalaryPage() {
   const [employeeSalaryData, setEmployeeSalaryData] = useState<EmployeeSalaryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [stats, setStats] = useState({
+    totalBudgetSalary: 0,
+    totalCalculatedSalary: 0,
+    averageDailyRate: 0,
+    employeeCount: 0,
+  });
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<null | string>(null);
   const { toast } = useToast();
@@ -178,7 +184,7 @@ export default function SalaryPage() {
     }
   }, [userProfile?.company_id, currentMonth, toast]);
 
-  // Directly fetch KPIs via single optimized rpc
+  // Only server-side stats for cards!
   const fetchSalaryStats = useCallback(async () => {
     setStatsLoading(true);
     setStatsError(null);
@@ -187,16 +193,18 @@ export default function SalaryPage() {
         setStatsLoading(false);
         return;
       }
-      // FIX: format currentMonth as string for target_month param
       const { data, error } = await supabase.rpc("get_monthly_salary_stats", {
         target_month: format(currentMonth, "yyyy-MM-dd"),
         in_company_id: userProfile.company_id,
       });
       if (error) throw error;
       if (data && data.length > 0) {
-        salaryStats.totalCalculatedSalary = Number(data[0].total_calculated_salary);
-        salaryStats.totalBudgetSalary = Number(data[0].total_budget_salary);
-        salaryStats.averageDailyRate = Number(data[0].average_daily_rate);
+        setStats({
+          totalCalculatedSalary: Number(data[0].total_calculated_salary),
+          totalBudgetSalary: Number(data[0].total_budget_salary),
+          averageDailyRate: Number(data[0].average_daily_rate),
+          employeeCount: Number(data[0].employee_count) ?? 0,
+        });
       }
     } catch (err: any) {
       setStatsError(err.message || "Failed to load stats");
@@ -204,14 +212,14 @@ export default function SalaryPage() {
       setStatsLoading(false);
     }
   }, [userProfile?.company_id, currentMonth]);
-  
-  // Fetch stats *and* salary data in parallel
+
+  // Fetch stats & salary data in parallel
   useEffect(() => {
     fetchSalaryStats();
     fetchSalaryData();
   }, [fetchSalaryStats, fetchSalaryData]);
 
-  // Set up timeout for spinner
+  // Spinner timeout fallback for stats
   useEffect(() => {
     if (statsLoading) {
       const timer = setTimeout(() => {
@@ -267,6 +275,7 @@ export default function SalaryPage() {
     }
   }, [employeeSalaryData, currentMonthName, totalWorkingDaysThisMonth, toast]);
   
+  // Summary Card rendering (update to use new "stats")
   return (
     <Dashboard title="Salary Management">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -285,18 +294,17 @@ export default function SalaryPage() {
               <div className="flex items-center">
                 <CircleDollarSign className="h-5 w-5 mr-2 text-green-400" />
                 <span className="text-2xl font-bold">
-                  {formatCurrency(salaryStats.totalBudgetSalary)}
+                  {formatCurrency(stats.totalBudgetSalary)}
                 </span>
               </div>
             )}
             {!statsLoading && !statsError &&
               <p className="text-xs text-white/60 mt-1">
-                For {employeeSalaryData.length} active employees
+                For {stats.employeeCount} active employees
               </p>
             }
           </CardContent>
         </Card>
-        
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white/60">
@@ -312,7 +320,7 @@ export default function SalaryPage() {
               <div className="flex items-center">
                 <Calendar className="h-5 w-5 mr-2 text-blue-400" />
                 <span className="text-2xl font-bold">
-                  {formatCurrency(salaryStats.totalCalculatedSalary)}
+                  {formatCurrency(stats.totalCalculatedSalary)}
                 </span>
               </div>
             )}
@@ -323,7 +331,6 @@ export default function SalaryPage() {
             }
           </CardContent>
         </Card>
-        
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white/60">
@@ -339,7 +346,7 @@ export default function SalaryPage() {
               <div className="flex items-center">
                 <Briefcase className="h-5 w-5 mr-2 text-purple-400" />
                 <span className="text-2xl font-bold">
-                  {formatCurrency(salaryStats.averageDailyRate)}
+                  {formatCurrency(stats.averageDailyRate)}
                 </span>
               </div>
             )}

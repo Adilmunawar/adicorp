@@ -62,6 +62,7 @@ export default function ReportsPage() {
     totalWorkingDaysThisMonth: 0,
   });
 
+  // Only fetch stats from server for summary cards
   const fetchReportStats = useCallback(async () => {
     setStatsLoading(true);
     setStatsError(null);
@@ -70,7 +71,6 @@ export default function ReportsPage() {
         setStatsLoading(false);
         return;
       }
-      // FIX: format currentMonth as string for target_month param
       const { data, error } = await supabase.rpc("get_monthly_salary_stats", {
         target_month: format(currentMonth, "yyyy-MM-dd"),
         in_company_id: userProfile.company_id,
@@ -80,8 +80,8 @@ export default function ReportsPage() {
         setStats({
           totalCalculatedSalary: Number(data[0].total_calculated_salary),
           totalEmployees: Number(data[0].employee_count),
-          averageAttendance: 0, // will be calculated in report body
-          totalWorkingDaysThisMonth: 22 // TODO: fetch for company config
+          averageAttendance: 0, // calculated in report body if needed
+          totalWorkingDaysThisMonth: 22 // fallback for working days (could fetch from config table)
         });
       }
     } catch (err: any) {
@@ -90,7 +90,7 @@ export default function ReportsPage() {
       setStatsLoading(false);
     }
   }, [userProfile?.company_id, currentMonth]);
-  
+
   // Memoized calculations for better performance
   const reportStats = useMemo(() => {
     const totalCalculatedSalary = attendanceReport.reduce((sum, report) => sum + report.calculatedSalary, 0);
