@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,7 +46,7 @@ interface Employee {
   rank: string;
   wage_rate: number;
   status: string;
-  user_id?: string;
+  user_id: string;
   company_id: string;
   created_at: string;
 }
