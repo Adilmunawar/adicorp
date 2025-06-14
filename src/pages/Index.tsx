@@ -624,8 +624,8 @@ export default function Index() {
                 </Button>
                 
                 <div className="flex items-center gap-2 text-white/70 group">
-                  <CheckCircle className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform duration-300" />
-                  <span className="group-hover:text-white/90 transition-colors duration-300">Free 30-day trial • No credit card required</span>
+                  
+                  
                 </div>
               </div>
             </div>
