@@ -29,7 +29,6 @@ import {
   Plus, 
   UserCheck, 
   UserX, 
-  Download,
   Upload,
   Loader2
 } from "lucide-react";
@@ -39,7 +38,7 @@ import { supabase } from "@/integrations/supabase/client";
 import EmployeeForm from "./EmployeeForm";
 import EmployeeImportExport from "./EmployeeImportExport";
 import { formatCurrencySync } from "@/utils/salaryCalculations";
-import { useCurrency } from "@/hooks/use-currency";
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface Employee {
   id: string;
