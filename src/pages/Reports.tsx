@@ -73,124 +73,104 @@ export default function ReportsPage() {
     };
   }, [attendanceReport]);
 
+  // PATCH: Efficient batched attendance processing for monthly reports
   const fetchReportsData = useCallback(async () => {
     try {
       setError(null);
-      
+
       if (!userProfile?.company_id) {
-        console.log("Reports - No company ID, skipping fetch");
         setLoading(false);
         return;
       }
-      
+
       setLoading(true);
-      console.log("Reports - Fetching data for company:", userProfile.company_id, "month:", format(currentMonth, 'yyyy-MM'));
-      
+
       const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-      
-      // Fix: Select all required fields to match EmployeeRow type
+
+      // Fetch employees and attendance in parallel
       const [employeeResult, attendanceResult] = await Promise.all([
         supabase
-          .from('employees')
-          .select('*')
-          .eq('company_id', userProfile.company_id)
-          .eq('status', 'active')
-          .order('name'),
+          .from("employees")
+          .select("*")
+          .eq("company_id", userProfile.company_id)
+          .eq("status", "active")
+          .order("name"),
         supabase
-          .from('attendance')
-          .select('employee_id, status, date')
-          .gte('date', monthStart)
-          .lte('date', monthEnd)
+          .from("attendance")
+          .select("employee_id,status,date")
+          .gte("date", monthStart)
+          .lte("date", monthEnd),
       ]);
-        
-      if (employeeResult.error) {
-        console.error("Reports - Error fetching employees:", employeeResult.error);
-        throw new Error(`Failed to fetch employees: ${employeeResult.error.message}`);
-      }
-      
-      if (attendanceResult.error && attendanceResult.error.code !== 'PGRST116') {
-        console.error("Reports - Error fetching attendance:", attendanceResult.error);
-        throw new Error(`Failed to fetch attendance: ${attendanceResult.error.message}`);
-      }
-      
+
+      if (employeeResult.error) throw new Error(employeeResult.error.message);
+      if (attendanceResult.error && attendanceResult.error.code !== "PGRST116") throw new Error(attendanceResult.error.message);
+
       const employeeData = employeeResult.data || [];
       setEmployees(employeeData);
-      
+
       if (employeeData.length === 0) {
         setAttendanceReport([]);
         setLoading(false);
         return;
       }
-      
+
       const attendanceData = attendanceResult.data || [];
-      const employeeIds = new Set(employeeData.map(emp => emp.id));
-      const filteredAttendance = attendanceData.filter(att => employeeIds.has(att.employee_id));
-      
-      // Process attendance efficiently with Map
+      const employeeIds = employeeData.map((emp) => emp.id);
       const attendanceMap = new Map();
-      filteredAttendance.forEach(record => {
-        const key = record.employee_id;
-        if (!attendanceMap.has(key)) {
-          attendanceMap.set(key, {
-            present: 0,
-            shortLeave: 0,
-            leave: 0
-          });
+      for (const att of attendanceData) {
+        if (!employeeIds.includes(att.employee_id)) continue;
+        if (!attendanceMap.has(att.employee_id)) {
+          attendanceMap.set(att.employee_id, []);
         }
-        
-        const stats = attendanceMap.get(key);
-        switch (record.status) {
-          case 'present':
-            stats.present++;
-            break;
-          case 'short_leave':
-            stats.shortLeave++;
-            break;
-          case 'leave':
-            stats.leave++;
-            break;
-        }
-      });
-      
+        attendanceMap.get(att.employee_id).push(att);
+      }
+
+      // Batch process attendance to reports (parallel map), then set state
       const reportData: AttendanceReport[] = await Promise.all(
         employeeData.map(async (employee) => {
-          const attendance = attendanceMap.get(employee.id) || {
-            present: 0,
-            shortLeave: 0,
-            leave: 0
-          };
-          
+          const attendance = attendanceMap.get(employee.id) || [];
+          let present = 0, shortLeave = 0, leave = 0;
+          attendance.forEach((rec) => {
+            switch (rec.status) {
+              case "present":
+                present++;
+                break;
+              case "short_leave":
+                shortLeave++;
+                break;
+              case "leave":
+                leave++;
+                break;
+            }
+          });
           const monthlySalary = Number(employee.wage_rate);
           const salaryCalc = await calculateEmployeeSalary(
             monthlySalary,
-            attendance.present,
-            attendance.shortLeave,
+            present,
+            shortLeave,
             currentMonth,
             userProfile.company_id
           );
-          
           return {
             employeeId: employee.id,
             employeeName: employee.name,
             rank: employee.rank,
             monthlySalary,
-            presentDays: attendance.present,
-            shortLeaveDays: attendance.shortLeave,
-            leaveDays: attendance.leave,
+            presentDays: present,
+            shortLeaveDays: shortLeave,
+            leaveDays: leave,
             totalWorkingDaysInMonth: salaryCalc.totalWorkingDays,
             actualWorkingDays: salaryCalc.actualWorkingDays,
             dailyRate: salaryCalc.dailyRate,
-            calculatedSalary: salaryCalc.calculatedSalary
+            calculatedSalary: salaryCalc.calculatedSalary,
           };
         })
       );
-      
+
       setAttendanceReport(reportData);
       console.log("Reports - Processed attendance report:", reportData.length, "employees");
-      
     } catch (error: any) {
-      console.error("Reports - Error loading data:", error);
       setError(error.message || "Failed to load reports data");
       toast({
         title: "Failed to load reports data",
@@ -201,7 +181,7 @@ export default function ReportsPage() {
       setLoading(false);
     }
   }, [userProfile?.company_id, currentMonth, toast]);
-  
+
   useEffect(() => {
     if (userProfile?.company_id) {
       fetchReportsData();

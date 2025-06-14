@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,118 +64,106 @@ export default function SalaryPage() {
     };
   }, [employeeSalaryData]);
   
+  // NEW: batch processing logic for attendance => salary data
   const fetchSalaryData = useCallback(async () => {
     try {
       if (!userProfile?.company_id) {
         setLoading(false);
         return;
       }
-      
+
       setLoading(true);
       console.log("Salary - Fetching salary data for company:", userProfile.company_id);
-      
+
       const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-      
+
       // Get total working days for this month
       const workingDays = await getWorkingDaysInMonthForSalary(currentMonth, userProfile.company_id);
       setTotalWorkingDaysThisMonth(workingDays);
-      
-      // Fetch employees and attendance in parallel for better performance
+
+      // Fetch employees and attendance in parallel
       const [employeesResult, attendanceResult] = await Promise.all([
         supabase
-          .from('employees')
-          .select('*')
-          .eq('company_id', userProfile.company_id)
-          .eq('status', 'active')
-          .order('name'),
+          .from("employees")
+          .select("*")
+          .eq("company_id", userProfile.company_id)
+          .eq("status", "active")
+          .order("name"),
         supabase
-          .from('attendance')
-          .select('*')
-          .gte('date', monthStart)
-          .lte('date', monthEnd)
+          .from("attendance")
+          .select("employee_id,status,date")
+          .gte("date", monthStart)
+          .lte("date", monthEnd),
       ]);
-      
+
       if (employeesResult.error) {
-        console.error("Salary - Error fetching employees:", employeesResult.error);
         throw employeesResult.error;
       }
-      
-      if (attendanceResult.error && attendanceResult.error.code !== 'PGRST116') {
-        console.error("Salary - Error fetching attendance:", attendanceResult.error);
+      if (attendanceResult.error && attendanceResult.error.code !== "PGRST116") {
         throw attendanceResult.error;
       }
-      
+
       const employees = employeesResult.data || [];
       const attendanceData = attendanceResult.data || [];
-      
+
       if (employees.length === 0) {
         setEmployeeSalaryData([]);
         setLoading(false);
         return;
       }
-      
-      // Filter attendance for current company employees
-      const employeeIds = employees.map(emp => emp.id);
-      const filteredAttendance = attendanceData.filter(att => employeeIds.includes(att.employee_id));
-      
-      // Process attendance data efficiently
+
+      // Create a map of employeeId -> attendance array
+      const employeeIds = employees.map((emp) => emp.id);
       const attendanceMap = new Map();
-      filteredAttendance.forEach(record => {
-        const key = record.employee_id;
-        if (!attendanceMap.has(key)) {
-          attendanceMap.set(key, {
-            present: 0,
-            shortLeave: 0,
-            leave: 0
-          });
+      for (const att of attendanceData) {
+        if (!employeeIds.includes(att.employee_id)) continue;
+        if (!attendanceMap.has(att.employee_id)) {
+          attendanceMap.set(att.employee_id, []);
         }
-        
-        const stats = attendanceMap.get(key);
-        switch (record.status) {
-          case 'present':
-            stats.present++;
-            break;
-          case 'short_leave':
-            stats.shortLeave++;
-            break;
-          case 'leave':
-            stats.leave++;
-            break;
-        }
-      });
-      
-      const salaryData: EmployeeSalaryData[] = [];
-      for (const employee of employees) {
-        const attendance = attendanceMap.get(employee.id) || {
-          present: 0,
-          shortLeave: 0,
-          leave: 0
-        };
-        
-        const monthlySalary = Number(employee.wage_rate);
-        const salaryCalc = await calculateEmployeeSalary(
-          monthlySalary,
-          attendance.present,
-          attendance.shortLeave,
-          currentMonth,
-          userProfile.company_id
-        );
-        
-        salaryData.push({
-          employee,
-          presentDays: attendance.present,
-          shortLeaveDays: attendance.shortLeave,
-          leaveDays: attendance.leave,
-          calculatedSalary: salaryCalc.calculatedSalary,
-          actualWorkingDays: salaryCalc.actualWorkingDays,
-          dailyRate: salaryCalc.dailyRate
-        });
+        attendanceMap.get(att.employee_id).push(att);
       }
-      
+
+      // Process salaries in parallel for all employees (faster for large data)
+      const salaryData: EmployeeSalaryData[] = await Promise.all(
+        employees.map(async (employee) => {
+          const attendance = attendanceMap.get(employee.id) || [];
+          let present = 0, shortLeave = 0, leave = 0;
+          attendance.forEach((rec) => {
+            switch (rec.status) {
+              case "present":
+                present++;
+                break;
+              case "short_leave":
+                shortLeave++;
+                break;
+              case "leave":
+                leave++;
+                break;
+            }
+          });
+          const monthlySalary = Number(employee.wage_rate);
+          const salaryCalc = await calculateEmployeeSalary(
+            monthlySalary,
+            present,
+            shortLeave,
+            currentMonth,
+            userProfile.company_id
+          );
+          return {
+            employee,
+            presentDays: present,
+            shortLeaveDays: shortLeave,
+            leaveDays: leave,
+            calculatedSalary: salaryCalc.calculatedSalary,
+            actualWorkingDays: salaryCalc.actualWorkingDays,
+            dailyRate: salaryCalc.dailyRate,
+          };
+        })
+      );
+
       setEmployeeSalaryData(salaryData);
       console.log("Salary - Processed salary data:", salaryData.length);
-      
     } catch (error) {
       console.error("Salary - Error fetching salary data:", error);
       toast({

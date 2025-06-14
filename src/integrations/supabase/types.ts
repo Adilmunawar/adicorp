@@ -237,6 +237,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_monthly_salary_stats: {
+        Args: { target_month: string; in_company_id: string }
+        Returns: {
+          total_calculated_salary: number
+          total_budget_salary: number
+          average_daily_rate: number
+          employee_count: number
+        }[]
+      }
       get_user_company_id: {
         Args: { user_id: string }
         Returns: string
