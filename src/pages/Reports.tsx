@@ -53,6 +53,42 @@ export default function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const { userProfile } = useAuth();
   const { toast } = useToast();
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [stats, setStats] = useState({
+    totalCalculatedSalary: 0,
+    totalEmployees: 0,
+    averageAttendance: 0,
+    totalWorkingDaysThisMonth: 0,
+  });
+
+  const fetchReportStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(null);
+    try {
+      if (!userProfile?.company_id) {
+        setStatsLoading(false);
+        return;
+      }
+      const { data, error } = await supabase.rpc("get_monthly_salary_stats", {
+        target_month: currentMonth,
+        in_company_id: userProfile.company_id,
+      });
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setStats({
+          totalCalculatedSalary: Number(data[0].total_calculated_salary),
+          totalEmployees: Number(data[0].employee_count),
+          averageAttendance: 0, // will be calculated in report body
+          totalWorkingDaysThisMonth: 22 // TODO: fetch for company config
+        });
+      }
+    } catch (err: any) {
+      setStatsError(err.message || "Failed to load stats");
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [userProfile?.company_id, currentMonth]);
 
   // Memoized calculations for better performance
   const reportStats = useMemo(() => {
@@ -183,12 +219,19 @@ export default function ReportsPage() {
   }, [userProfile?.company_id, currentMonth, toast]);
 
   useEffect(() => {
-    if (userProfile?.company_id) {
-      fetchReportsData();
-    } else {
-      setLoading(false);
+    fetchReportStats();
+    fetchReportsData();
+  }, [fetchReportStats, fetchReportsData]);
+
+  useEffect(() => {
+    if (statsLoading) {
+      const timer = setTimeout(() => {
+        setStatsLoading(false);
+        setStatsError("Loading timed out. Please retry.");
+      }, 10000);
+      return () => clearTimeout(timer);
     }
-  }, [fetchReportsData, userProfile?.company_id]);
+  }, [statsLoading]);
 
   const handleDownload = useCallback(async (type: 'attendance' | 'salary') => {
     setDownloading(true);
@@ -341,10 +384,16 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <Users className="h-5 w-5 mr-2 text-blue-400" />
-              <span className="text-2xl font-bold">{reportStats.totalEmployees}</span>
-            </div>
+            {statsLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+            ) : statsError ? (
+              <span className="text-xs text-red-400">{statsError}</span>
+            ) : (
+              <div className="flex items-center">
+                <Users className="h-5 w-5 mr-2 text-blue-400" />
+                <span className="text-2xl font-bold">{stats.totalEmployees}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
         
@@ -355,12 +404,18 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <Clock className="h-5 w-5 mr-2 text-green-400" />
-              <span className="text-2xl font-bold">
-                {reportStats.averageAttendance.toFixed(1)} days
-              </span>
-            </div>
+            {statsLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-green-400" />
+            ) : statsError ? (
+              <span className="text-xs text-red-400">{statsError}</span>
+            ) : (
+              <div className="flex items-center">
+                <Clock className="h-5 w-5 mr-2 text-green-400" />
+                <span className="text-2xl font-bold">
+                  {stats.averageAttendance.toFixed(1)} days
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
         
@@ -371,12 +426,18 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
-              <span className="text-2xl font-bold">
-                {formatCurrency(reportStats.totalCalculatedSalary)}
-              </span>
-            </div>
+            {statsLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+            ) : statsError ? (
+              <span className="text-xs text-red-400">{statsError}</span>
+            ) : (
+              <div className="flex items-center">
+                <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
+                <span className="text-2xl font-bold">
+                  {formatCurrency(stats.totalCalculatedSalary)}
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
         
@@ -387,12 +448,18 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <Calendar className="h-5 w-5 mr-2 text-orange-400" />
-              <span className="text-2xl font-bold">
-                {reportStats.totalWorkingDaysThisMonth} days
-              </span>
-            </div>
+            {statsLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-orange-400" />
+            ) : statsError ? (
+              <span className="text-xs text-red-400">{statsError}</span>
+            ) : (
+              <div className="flex items-center">
+                <Calendar className="h-5 w-5 mr-2 text-orange-400" />
+                <span className="text-2xl font-bold">
+                  {stats.totalWorkingDaysThisMonth} days
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

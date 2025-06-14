@@ -41,6 +41,8 @@ export default function SalaryPage() {
   const [employeeSalaryData, setEmployeeSalaryData] = useState<EmployeeSalaryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<null | string>(null);
   const { toast } = useToast();
   const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("salary-sheet");
@@ -176,9 +178,48 @@ export default function SalaryPage() {
     }
   }, [userProfile?.company_id, currentMonth, toast]);
 
+  // Directly fetch KPIs via single optimized rpc
+  const fetchSalaryStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(null);
+    try {
+      if (!userProfile?.company_id) {
+        setStatsLoading(false);
+        return;
+      }
+      const { data, error } = await supabase.rpc("get_monthly_salary_stats", {
+        target_month: currentMonth,
+        in_company_id: userProfile.company_id,
+      });
+      if (error) throw error;
+      if (data && data.length > 0) {
+        salaryStats.totalCalculatedSalary = Number(data[0].total_calculated_salary);
+        salaryStats.totalBudgetSalary = Number(data[0].total_budget_salary);
+        salaryStats.averageDailyRate = Number(data[0].average_daily_rate);
+      }
+    } catch (err: any) {
+      setStatsError(err.message || "Failed to load stats");
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [userProfile?.company_id, currentMonth]);
+
+  // Fetch stats *and* salary data in parallel
   useEffect(() => {
+    fetchSalaryStats();
     fetchSalaryData();
-  }, [fetchSalaryData]);
+  }, [fetchSalaryStats, fetchSalaryData]);
+
+  // Set up timeout for spinner
+  useEffect(() => {
+    if (statsLoading) {
+      const timer = setTimeout(() => {
+        setStatsLoading(false);
+        setStatsError("Loading timed out. Please retry.");
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [statsLoading]);
 
   const handleDownload = useCallback(async (type: 'salary-sheet' | 'payslips') => {
     setDownloading(true);
@@ -235,15 +276,23 @@ export default function SalaryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <CircleDollarSign className="h-5 w-5 mr-2 text-green-400" />
-              <span className="text-2xl font-bold">
-                {formatCurrency(salaryStats.totalBudgetSalary)}
-              </span>
-            </div>
-            <p className="text-xs text-white/60 mt-1">
-              For {employeeSalaryData.length} active employees
-            </p>
+            {statsLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-green-400" />
+            ) : statsError ? (
+              <div className="text-xs text-red-400">{statsError}</div>
+            ) : (
+              <div className="flex items-center">
+                <CircleDollarSign className="h-5 w-5 mr-2 text-green-400" />
+                <span className="text-2xl font-bold">
+                  {formatCurrency(salaryStats.totalBudgetSalary)}
+                </span>
+              </div>
+            )}
+            {!statsLoading && !statsError &&
+              <p className="text-xs text-white/60 mt-1">
+                For {employeeSalaryData.length} active employees
+              </p>
+            }
           </CardContent>
         </Card>
         
@@ -254,15 +303,23 @@ export default function SalaryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <Calendar className="h-5 w-5 mr-2 text-blue-400" />
-              <span className="text-2xl font-bold">
-                {formatCurrency(salaryStats.totalCalculatedSalary)}
-              </span>
-            </div>
-            <p className="text-xs text-white/60 mt-1">
-              Based on actual attendance
-            </p>
+            {statsLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+            ) : statsError ? (
+              <div className="text-xs text-red-400">{statsError}</div>
+            ) : (
+              <div className="flex items-center">
+                <Calendar className="h-5 w-5 mr-2 text-blue-400" />
+                <span className="text-2xl font-bold">
+                  {formatCurrency(salaryStats.totalCalculatedSalary)}
+                </span>
+              </div>
+            )}
+            {!statsLoading && !statsError &&
+              <p className="text-xs text-white/60 mt-1">
+                Based on actual attendance
+              </p>
+            }
           </CardContent>
         </Card>
         
@@ -273,15 +330,23 @@ export default function SalaryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <Briefcase className="h-5 w-5 mr-2 text-purple-400" />
-              <span className="text-2xl font-bold">
-                {formatCurrency(salaryStats.averageDailyRate)}
-              </span>
-            </div>
-            <p className="text-xs text-white/60 mt-1">
-              Per employee per working day
-            </p>
+            {statsLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+            ) : statsError ? (
+              <div className="text-xs text-red-400">{statsError}</div>
+            ) : (
+              <div className="flex items-center">
+                <Briefcase className="h-5 w-5 mr-2 text-purple-400" />
+                <span className="text-2xl font-bold">
+                  {formatCurrency(salaryStats.averageDailyRate)}
+                </span>
+              </div>
+            )}
+            {!statsLoading && !statsError &&
+              <p className="text-xs text-white/60 mt-1">
+                Per employee per working day
+              </p>
+            }
           </CardContent>
         </Card>
       </div>
