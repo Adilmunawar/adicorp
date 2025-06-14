@@ -11,7 +11,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { ActivityLogRow } from "@/types/supabase";
 import { formatDistanceToNow } from "date-fns";
 
 export default function NotificationDropdown() {
@@ -27,7 +26,7 @@ export default function NotificationDropdown() {
         .from('activity_logs')
         .select(`
           *,
-          profiles!activity_logs_user_id_fkey (
+          profiles (
             first_name,
             last_name
           )

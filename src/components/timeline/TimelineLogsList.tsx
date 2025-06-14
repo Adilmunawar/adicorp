@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,7 +92,7 @@ export default function TimelineLogsList() {
           user_id,
           company_id,
           created_at,
-          profiles:user_id (
+          profiles (
             first_name,
             last_name
           )
