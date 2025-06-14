@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,58 +97,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
-    
+
     const initializeAuth = async () => {
       try {
         console.log("AuthContext - Initializing authentication");
-        
-        // Set up auth state listener first
+
+        // 1. Set up a synchronous listener (no async!)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, currentSession) => {
+          (event, currentSession) => {
             if (!mounted) return;
-            
+
             console.log("AuthContext - Auth state changed:", event, currentSession?.user?.id);
-            
-            if (event === 'SIGNED_IN' && currentSession?.user) {
-              setSession(currentSession);
-              setUser(currentSession.user);
-              // Fetch profile after setting user
-              setTimeout(async () => {
-                if (mounted) {
-                  await fetchUserProfile(currentSession.user.id);
-                  setLoading(false);
-                  sonnerToast.success('Successfully logged in!', {
-                    description: 'Welcome back to AdiCorp Management'
-                  });
-                }
-              }, 100);
-            } else if (event === 'SIGNED_OUT') {
-              setSession(null);
-              setUser(null);
+
+            setSession(currentSession || null);
+            setUser(currentSession?.user || null);
+
+            if (event === 'SIGNED_OUT') {
               setUserProfile(null);
-              setLoading(false);
-              sonnerToast.success('Logged out successfully');
-            } else if (event === 'TOKEN_REFRESHED' && currentSession) {
-              setSession(currentSession);
-              setUser(currentSession.user);
+              setLoading(false); // immediately stop loading if signed out
+            }
+            if (event === 'SIGNED_IN') {
+              // setLoading(false); -- do this in fetchProfile effect below
             }
           }
         );
 
-        // Then check for existing session
+        // 2. Initial session load (fire once)
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-        
         if (error) {
           console.error("AuthContext - Error getting session:", error);
-        } else if (initialSession?.user) {
-          console.log("AuthContext - Found existing session");
+        } else {
           setSession(initialSession);
-          setUser(initialSession.user);
-          await fetchUserProfile(initialSession.user.id);
+          setUser(initialSession?.user || null);
         }
-        
+
         if (mounted) {
-          setLoading(false);
           setInitialized(true);
         }
 
@@ -172,6 +154,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       mounted = false;
     };
   }, []);
+
+  // 3. Profile side effect -- now triggers on user change
+  useEffect(() => {
+    if (user?.id) {
+      setLoading(true);
+      fetchUserProfile(user.id).finally(() => setLoading(false));
+    } else {
+      setUserProfile(null);
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const signIn = async (email: string, password: string) => {
     try {
