@@ -363,7 +363,7 @@ export default function Index() {
               <Button size="lg" className="bg-gradient-to-r from-blue-500 via-purple-600 to-indigo-600 hover:from-blue-600 hover:via-purple-700 hover:to-indigo-700 btn-glow transform hover:scale-110 transition-all duration-300 shadow-2xl text-lg px-8 py-4 rounded-xl relative overflow-hidden group" onClick={() => navigate("/auth")}>
                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                 <Rocket className="w-5 h-5 mr-2 relative z-10" />
-                <span className="relative z-10">Start Free Trial</span>
+                <span className="relative z-10">Get Started</span>
                 <ChevronRight className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
               </Button>
               
