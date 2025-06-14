@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Clock, AlertTriangle, CheckCircle } from "lucide-react";
+import { Shield, Clock, AlertTriangle, CheckCircle, Edit } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 interface WorkingTimePolicy {
