@@ -37,3 +37,5 @@ export const PrivateRoute = ({ children }: PrivateRouteProps) => {
 
   return user ? <>{children}</> : <Navigate to="/auth" state={{ from: location }} replace />;
 };
+
+export default PrivateRoute;

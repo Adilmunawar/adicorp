@@ -21,6 +21,10 @@ export type AttendanceRow = Database['public']['Tables']['attendance']['Row'];
 export type AttendanceInsert = Database['public']['Tables']['attendance']['Insert'];
 export type AttendanceUpdate = Database['public']['Tables']['attendance']['Update'];
 
+export type ActivityLogRow = Database['public']['Tables']['activity_logs']['Row'];
+export type ActivityLogInsert = Database['public']['Tables']['activity_logs']['Insert'];
+export type ActivityLogUpdate = Database['public']['Tables']['activity_logs']['Update'];
+
 // Define custom types
 export type AttendanceStatus = 'present' | 'short_leave' | 'leave';
 export type EmployeeStatus = 'active' | 'inactive';

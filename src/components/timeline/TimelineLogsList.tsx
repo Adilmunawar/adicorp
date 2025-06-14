@@ -116,12 +116,12 @@ export default function TimelineLogsList() {
       const { data, error } = await query;
       if (error) throw error;
 
-      return data.map(log => ({
+      return data?.map(log => ({
         ...log,
         user_email: log.profiles ? 
           `${log.profiles.first_name || ''} ${log.profiles.last_name || ''}`.trim() || 'Unknown User'
           : 'System'
-      }));
+      })) || [];
     },
     enabled: !!userProfile?.company_id,
   });
