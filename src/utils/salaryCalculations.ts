@@ -1,41 +1,77 @@
 
-import { getDailyRateDivisor, getWorkingDaysInMonth } from "./workingDays";
+import { dataIntegrationService } from "@/services/dataIntegrationService";
+import { getDailyRateDivisor } from "@/utils/workingDays";
 
-export interface SalaryCalculation {
-  totalWorkingDays: number;
-  dailyRate: number;
-  actualWorkingDays: number;
-  calculatedSalary: number;
+export interface SalaryData {
+  employee_id: string;
+  employee_name: string;
+  basic_salary: number;
+  present_days: number;
+  absent_days: number;
+  overtime_hours: number;
+  gross_salary: number;
+  deductions: number;
+  net_salary: number;
+  working_days: number;
 }
 
-// Calculate employee salary based on attendance with dynamic divisor
-export const calculateEmployeeSalary = async (
-  monthlySalary: number,
-  presentDays: number,
-  shortLeaveDays: number,
-  currentMonth: Date,
-  companyId: string
-): Promise<SalaryCalculation> => {
-  // Get dynamic divisor based on company settings (22 if Saturday off, 26 if Saturday working)
-  const dailyRateDivisor = await getDailyRateDivisor(companyId);
-  const dailyRate = monthlySalary / dailyRateDivisor;
-  
-  // Calculate actual working days (short leave counts as 0.5 days)
-  const actualWorkingDays = presentDays + (shortLeaveDays * 0.5);
-  const calculatedSalary = dailyRate * actualWorkingDays;
-  
-  return {
-    totalWorkingDays: dailyRateDivisor, // For display purposes
-    dailyRate,
-    actualWorkingDays,
-    calculatedSalary
-  };
+export const calculateMonthlySalaries = async (
+  companyId: string,
+  month: Date
+): Promise<SalaryData[]> => {
+  try {
+    const [employees, salaryCalculations] = await Promise.all([
+      dataIntegrationService.getEmployees(companyId),
+      dataIntegrationService.calculateSalariesForMonth(companyId, month)
+    ]);
+
+    return salaryCalculations.map(calc => {
+      const employee = employees.find(emp => emp.id === calc.employee_id);
+      return {
+        employee_id: calc.employee_id,
+        employee_name: employee?.name || 'Unknown Employee',
+        basic_salary: Math.round(calc.basic_salary * 100) / 100,
+        present_days: calc.present_days,
+        absent_days: calc.absent_days,
+        overtime_hours: Math.round(calc.overtime_hours * 100) / 100,
+        gross_salary: Math.round(calc.gross_salary * 100) / 100,
+        deductions: Math.round(calc.deductions * 100) / 100,
+        net_salary: Math.round(calc.net_salary * 100) / 100,
+        working_days: calc.working_days
+      };
+    });
+  } catch (error) {
+    console.error('Error calculating monthly salaries:', error);
+    return [];
+  }
 };
 
-// Export alias for backward compatibility
-export const getWorkingDaysInMonthForSalary = getWorkingDaysInMonth;
+export const calculateDailySalary = async (
+  baseSalary: number,
+  companyId: string
+): Promise<number> => {
+  try {
+    const dailyRateDivisor = await getDailyRateDivisor(companyId);
+    return Math.round((baseSalary / dailyRateDivisor) * 100) / 100;
+  } catch (error) {
+    console.error('Error calculating daily salary:', error);
+    return baseSalary / 22; // fallback
+  }
+};
 
-// Format currency for display
-export const formatCurrency = (amount: number): string => {
-  return `PKR ${Math.round(amount).toLocaleString('en-PK')}`;
+export const calculateOvertimePay = async (
+  baseSalary: number,
+  overtimeHours: number,
+  companyId: string,
+  overtimeMultiplier: number = 1.5
+): Promise<number> => {
+  try {
+    const dailyRateDivisor = await getDailyRateDivisor(companyId);
+    const hourlyRate = baseSalary / (dailyRateDivisor * 8); // 8 hours per day
+    const overtimeRate = hourlyRate * overtimeMultiplier;
+    return Math.round(overtimeRate * overtimeHours * 100) / 100;
+  } catch (error) {
+    console.error('Error calculating overtime pay:', error);
+    return 0;
+  }
 };

@@ -9,7 +9,8 @@ import {
   ChartPie,
   UserCog,
   LogOut,
-  Home
+  Home,
+  Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -21,6 +22,8 @@ const navItems = [
   { name: "Attendance", icon: Clock, path: "/attendance" },
   { name: "Salary", icon: BarChart, path: "/salary" },
   { name: "Reports", icon: ChartPie, path: "/reports" },
+  { name: "Working Days", icon: Calendar, path: "/working-days" },
+  { name: "Events", icon: Shield, path: "/events" },
   { name: "Settings", icon: Settings, path: "/settings" },
 ];
 
