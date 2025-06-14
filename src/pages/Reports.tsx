@@ -25,12 +25,11 @@ import {
   ChevronRight,
   RefreshCw
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { EmployeeRow } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
-import { calculateEmployeeSalary, formatCurrency } from "@/utils/salaryCalculations";
+import { format, addMonths, subMonths } from "date-fns";
+import { formatCurrency } from "@/utils/salaryCalculations";
+import { ReportDataService } from "@/services/reportDataService";
 
 interface AttendanceReport {
   employeeId: string;
@@ -69,128 +68,44 @@ export default function ReportsPage() {
   const { toast } = useToast();
 
   const fetchReportsData = useCallback(async () => {
+    if (!userProfile?.company_id) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      setError(null);
-
-      if (!userProfile?.company_id) {
-        setLoading(false);
-        return;
-      }
-
       setLoading(true);
-      console.log("Reports - Fetching data for company:", userProfile.company_id);
-
-      const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-      const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-
-      // Fetch employees and attendance in parallel
-      const [employeeResult, attendanceResult] = await Promise.all([
-        supabase
-          .from("employees")
-          .select("*")
-          .eq("company_id", userProfile.company_id)
-          .eq("status", "active")
-          .order("name"),
-        supabase
-          .from("attendance")
-          .select("employee_id,status,date")
-          .gte("date", monthStart)
-          .lte("date", monthEnd),
-      ]);
-
-      if (employeeResult.error) {
-        throw new Error(`Failed to fetch employees: ${employeeResult.error.message}`);
-      }
-      if (attendanceResult.error && attendanceResult.error.code !== "PGRST116") {
-        throw new Error(`Failed to fetch attendance: ${attendanceResult.error.message}`);
-      }
-
-      const employeeData = employeeResult.data || [];
-      const attendanceData = attendanceResult.data || [];
-
-      if (employeeData.length === 0) {
-        setAttendanceReport([]);
-        setStats({
-          totalCalculatedSalary: 0,
-          totalEmployees: 0,
-          averageAttendance: 0,
-          totalWorkingDaysThisMonth: 22, // default
-        });
-        setLoading(false);
-        return;
-      }
-
-      const employeeIds = employeeData.map((emp) => emp.id);
-      const attendanceMap = new Map();
-      for (const att of attendanceData) {
-        if (!employeeIds.includes(att.employee_id)) continue;
-        if (!attendanceMap.has(att.employee_id)) {
-          attendanceMap.set(att.employee_id, []);
-        }
-        attendanceMap.get(att.employee_id).push(att);
-      }
-
-      // Process attendance to reports
-      const reportData: AttendanceReport[] = await Promise.all(
-        employeeData.map(async (employee) => {
-          const attendance = attendanceMap.get(employee.id) || [];
-          let present = 0, shortLeave = 0, leave = 0;
-          attendance.forEach((rec) => {
-            switch (rec.status) {
-              case "present":
-                present++;
-                break;
-              case "short_leave":
-                shortLeave++;
-                break;
-              case "leave":
-                leave++;
-                break;
-            }
-          });
-          const monthlySalary = Number(employee.wage_rate);
-          const salaryCalc = await calculateEmployeeSalary(
-            monthlySalary,
-            present,
-            shortLeave,
-            currentMonth,
-            userProfile.company_id
-          );
-          return {
-            employeeId: employee.id,
-            employeeName: employee.name,
-            rank: employee.rank,
-            monthlySalary,
-            presentDays: present,
-            shortLeaveDays: shortLeave,
-            leaveDays: leave,
-            totalWorkingDaysInMonth: salaryCalc.totalWorkingDays,
-            actualWorkingDays: salaryCalc.actualWorkingDays,
-            dailyRate: salaryCalc.dailyRate,
-            calculatedSalary: salaryCalc.calculatedSalary,
-          };
-        })
+      setError(null);
+      
+      const { employeeData, stats: reportStats } = await ReportDataService.fetchReportData(
+        userProfile.company_id,
+        currentMonth
       );
 
-      // Calculate stats from processed data
-      const totalCalculatedSalary = reportData.reduce((sum, report) => sum + report.calculatedSalary, 0);
-      const totalEmployees = reportData.length;
-      const averageAttendance = totalEmployees > 0 
-        ? reportData.reduce((sum, report) => sum + report.actualWorkingDays, 0) / totalEmployees
-        : 0;
-      const totalWorkingDaysThisMonth = reportData.length > 0 
-        ? reportData[0].totalWorkingDaysInMonth 
-        : 22;
+      // Transform to expected format
+      const transformedData = employeeData.map(emp => ({
+        employeeId: emp.employeeId,
+        employeeName: emp.employeeName,
+        rank: emp.rank,
+        monthlySalary: emp.monthlySalary,
+        presentDays: emp.presentDays,
+        shortLeaveDays: emp.shortLeaveDays,
+        leaveDays: emp.leaveDays,
+        totalWorkingDaysInMonth: reportStats.totalWorkingDaysThisMonth,
+        actualWorkingDays: emp.actualWorkingDays,
+        dailyRate: emp.dailyRate,
+        calculatedSalary: emp.calculatedSalary,
+      }));
 
-      setAttendanceReport(reportData);
+      setAttendanceReport(transformedData);
       setStats({
-        totalCalculatedSalary,
-        totalEmployees,
-        averageAttendance,
-        totalWorkingDaysThisMonth
+        totalCalculatedSalary: reportStats.totalCalculatedSalary,
+        totalEmployees: reportStats.totalEmployees,
+        averageAttendance: reportStats.averageAttendance,
+        totalWorkingDaysThisMonth: reportStats.totalWorkingDaysThisMonth,
       });
 
-      console.log("Reports - Successfully processed data:", reportData.length, "employees");
+      console.log("Reports - Successfully loaded data:", transformedData.length, "employees");
     } catch (error: any) {
       setError(error.message || "Failed to load reports data");
       toast({
@@ -269,6 +184,7 @@ export default function ReportsPage() {
   };
 
   const handleRetry = () => {
+    ReportDataService.clearCache();
     fetchReportsData();
   };
 

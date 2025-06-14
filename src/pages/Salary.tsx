@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,15 +22,17 @@ import {
   Loader2,
   RefreshCw
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { EmployeeRow } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfMonth, endOfMonth } from "date-fns";
-import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonthForSalary } from "@/utils/salaryCalculations";
+import { format } from "date-fns";
+import { formatCurrency } from "@/utils/salaryCalculations";
+import { ReportDataService } from "@/services/reportDataService";
 
 interface EmployeeSalaryData {
-  employee: EmployeeRow;
+  employeeId: string;
+  employeeName: string;
+  rank: string;
+  monthlySalary: number;
   presentDays: number;
   shortLeaveDays: number;
   leaveDays: number;
@@ -57,135 +59,52 @@ export default function SalaryPage() {
     employeeCount: 0,
   });
   const [error, setError] = useState<string | null>(null);
+  const [totalWorkingDaysThisMonth, setTotalWorkingDaysThisMonth] = useState(0);
   const { toast } = useToast();
   const { userProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState("salary-sheet");
-  const [totalWorkingDaysThisMonth, setTotalWorkingDaysThisMonth] = useState(0);
   
   const currentMonth = new Date();
   const currentMonthName = format(currentMonth, "MMMM yyyy");
 
-  // Combined data fetching function
   const fetchAllData = useCallback(async () => {
-    try {
-      if (!userProfile?.company_id) {
-        setLoading(false);
-        return;
-      }
+    if (!userProfile?.company_id) {
+      setLoading(false);
+      return;
+    }
 
+    try {
       setLoading(true);
       setError(null);
-      console.log("Salary - Fetching all data for company:", userProfile.company_id);
-
-      const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-      const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-
-      // Get total working days for this month
-      const workingDays = await getWorkingDaysInMonthForSalary(currentMonth, userProfile.company_id);
-      setTotalWorkingDaysThisMonth(workingDays);
-
-      // Fetch employees and attendance in parallel
-      const [employeesResult, attendanceResult] = await Promise.all([
-        supabase
-          .from("employees")
-          .select("*")
-          .eq("company_id", userProfile.company_id)
-          .eq("status", "active")
-          .order("name"),
-        supabase
-          .from("attendance")
-          .select("employee_id,status,date")
-          .gte("date", monthStart)
-          .lte("date", monthEnd),
-      ]);
-
-      if (employeesResult.error) {
-        throw new Error(`Failed to fetch employees: ${employeesResult.error.message}`);
-      }
-      if (attendanceResult.error && attendanceResult.error.code !== "PGRST116") {
-        throw new Error(`Failed to fetch attendance: ${attendanceResult.error.message}`);
-      }
-
-      const employees = employeesResult.data || [];
-      const attendanceData = attendanceResult.data || [];
-
-      if (employees.length === 0) {
-        setEmployeeSalaryData([]);
-        setStats({
-          totalBudgetSalary: 0,
-          totalCalculatedSalary: 0,
-          averageDailyRate: 0,
-          employeeCount: 0,
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Create a map of employeeId -> attendance array
-      const employeeIds = employees.map((emp) => emp.id);
-      const attendanceMap = new Map();
-      for (const att of attendanceData) {
-        if (!employeeIds.includes(att.employee_id)) continue;
-        if (!attendanceMap.has(att.employee_id)) {
-          attendanceMap.set(att.employee_id, []);
-        }
-        attendanceMap.get(att.employee_id).push(att);
-      }
-
-      // Process salaries in parallel for all employees
-      const salaryData: EmployeeSalaryData[] = await Promise.all(
-        employees.map(async (employee) => {
-          const attendance = attendanceMap.get(employee.id) || [];
-          let present = 0, shortLeave = 0, leave = 0;
-          attendance.forEach((rec) => {
-            switch (rec.status) {
-              case "present":
-                present++;
-                break;
-              case "short_leave":
-                shortLeave++;
-                break;
-              case "leave":
-                leave++;
-                break;
-            }
-          });
-          const monthlySalary = Number(employee.wage_rate);
-          const salaryCalc = await calculateEmployeeSalary(
-            monthlySalary,
-            present,
-            shortLeave,
-            currentMonth,
-            userProfile.company_id
-          );
-          return {
-            employee,
-            presentDays: present,
-            shortLeaveDays: shortLeave,
-            leaveDays: leave,
-            calculatedSalary: salaryCalc.calculatedSalary,
-            actualWorkingDays: salaryCalc.actualWorkingDays,
-            dailyRate: salaryCalc.dailyRate,
-          };
-        })
+      
+      const { employeeData, stats: reportStats } = await ReportDataService.fetchReportData(
+        userProfile.company_id,
+        currentMonth
       );
 
-      // Calculate stats from the processed data
-      const totalCalculatedSalary = salaryData.reduce((total, data) => total + data.calculatedSalary, 0);
-      const totalBudgetSalary = salaryData.reduce((total, data) => total + Number(data.employee.wage_rate), 0);
-      const averageDailyRate = salaryData.length > 0 
-        ? salaryData.reduce((total, data) => total + data.dailyRate, 0) / salaryData.length
-        : 0;
+      // Transform to expected format
+      const transformedData = employeeData.map(emp => ({
+        employeeId: emp.employeeId,
+        employeeName: emp.employeeName,
+        rank: emp.rank,
+        monthlySalary: emp.monthlySalary,
+        presentDays: emp.presentDays,
+        shortLeaveDays: emp.shortLeaveDays,
+        leaveDays: emp.leaveDays,
+        calculatedSalary: emp.calculatedSalary,
+        actualWorkingDays: emp.actualWorkingDays,
+        dailyRate: emp.dailyRate,
+      }));
 
-      setEmployeeSalaryData(salaryData);
+      setEmployeeSalaryData(transformedData);
+      setTotalWorkingDaysThisMonth(reportStats.totalWorkingDaysThisMonth);
       setStats({
-        totalCalculatedSalary,
-        totalBudgetSalary,
-        averageDailyRate,
-        employeeCount: salaryData.length
+        totalCalculatedSalary: reportStats.totalCalculatedSalary,
+        totalBudgetSalary: reportStats.totalBudgetSalary,
+        averageDailyRate: reportStats.averageDailyRate,
+        employeeCount: reportStats.totalEmployees
       });
       
-      console.log("Salary - Successfully processed data:", salaryData.length);
+      console.log("Salary - Successfully processed data:", transformedData.length);
     } catch (error: any) {
       console.error("Salary - Error fetching data:", error);
       setError(error.message || "Failed to load salary data");
@@ -211,12 +130,12 @@ export default function SalaryPage() {
       if (type === 'salary-sheet') {
         csvContent = 'Employee,Position,Monthly Salary,Daily Rate,Working Days,Calculated Salary,Status\n';
         employeeSalaryData.forEach(data => {
-          csvContent += `"${data.employee.name}","${data.employee.rank}","${formatCurrency(Number(data.employee.wage_rate))}","${formatCurrency(data.dailyRate)}","${data.actualWorkingDays}/${totalWorkingDaysThisMonth}","${formatCurrency(data.calculatedSalary)}","${data.actualWorkingDays > 0 ? 'Earned' : 'No Attendance'}"\n`;
+          csvContent += `"${data.employeeName}","${data.rank}","${formatCurrency(data.monthlySalary)}","${formatCurrency(data.dailyRate)}","${data.actualWorkingDays}/${totalWorkingDaysThisMonth}","${formatCurrency(data.calculatedSalary)}","${data.actualWorkingDays > 0 ? 'Earned' : 'No Attendance'}"\n`;
         });
       } else {
         csvContent = 'Employee,Position,Monthly Salary,Daily Rate,Present Days,Short Leave,Working Days,Calculated Salary\n';
         employeeSalaryData.forEach(data => {
-          csvContent += `"${data.employee.name}","${data.employee.rank}","${formatCurrency(Number(data.employee.wage_rate))}","${formatCurrency(data.dailyRate)}","${data.presentDays}","${data.shortLeaveDays}","${data.actualWorkingDays}/${totalWorkingDaysThisMonth}","${formatCurrency(data.calculatedSalary)}"\n`;
+          csvContent += `"${data.employeeName}","${data.rank}","${formatCurrency(data.monthlySalary)}","${formatCurrency(data.dailyRate)}","${data.presentDays}","${data.shortLeaveDays}","${data.actualWorkingDays}/${totalWorkingDaysThisMonth}","${formatCurrency(data.calculatedSalary)}"\n`;
         });
       }
       
@@ -248,6 +167,7 @@ export default function SalaryPage() {
   }, [employeeSalaryData, currentMonthName, totalWorkingDaysThisMonth, toast]);
 
   const handleRetry = () => {
+    ReportDataService.clearCache();
     fetchAllData();
   };
 
@@ -363,7 +283,7 @@ export default function SalaryPage() {
         </Card>
       </div>
       
-      <Tabs defaultValue="salary-sheet" className="space-y-4" onValueChange={setActiveTab}>
+      <Tabs defaultValue="salary-sheet" className="space-y-4">
         <TabsList className="glass-card bg-adicorp-dark-light/60 grid grid-cols-2 mb-4">
           <TabsTrigger value="salary-sheet" className="data-[state=active]:bg-adicorp-purple data-[state=active]:text-white">
             <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -417,12 +337,12 @@ export default function SalaryPage() {
                   <TableBody>
                     {employeeSalaryData.map((data) => (
                       <TableRow 
-                        key={data.employee.id} 
+                        key={data.employeeId} 
                         className="border-white/10 hover:bg-adicorp-dark/30"
                       >
-                        <TableCell className="font-medium">{data.employee.name}</TableCell>
-                        <TableCell>{data.employee.rank}</TableCell>
-                        <TableCell>{formatCurrency(Number(data.employee.wage_rate))}</TableCell>
+                        <TableCell className="font-medium">{data.employeeName}</TableCell>
+                        <TableCell>{data.rank}</TableCell>
+                        <TableCell>{formatCurrency(data.monthlySalary)}</TableCell>
                         <TableCell>{formatCurrency(data.dailyRate)}</TableCell>
                         <TableCell>{data.actualWorkingDays} / {totalWorkingDaysThisMonth}</TableCell>
                         <TableCell className="font-bold text-green-400">
@@ -475,24 +395,24 @@ export default function SalaryPage() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {employeeSalaryData.map((data) => (
-                    <Card key={data.employee.id} className="bg-adicorp-dark-light/40 border-white/5">
+                    <Card key={data.employeeId} className="bg-adicorp-dark-light/40 border-white/5">
                       <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                           <div>
-                            <CardTitle className="text-lg">{data.employee.name}</CardTitle>
-                            <p className="text-sm text-white/60">{data.employee.rank}</p>
+                            <CardTitle className="text-lg">{data.employeeName}</CardTitle>
+                            <p className="text-sm text-white/60">{data.rank}</p>
                           </div>
                           <Button 
                             size="sm" 
                             variant="outline" 
                             className="border-white/10 hover:bg-adicorp-dark"
                             onClick={() => {
-                              const csvContent = `Employee: ${data.employee.name}\nPosition: ${data.employee.rank}\nMonthly Salary: ${formatCurrency(Number(data.employee.wage_rate))}\nDaily Rate: ${formatCurrency(data.dailyRate)}\nWorking Days: ${data.actualWorkingDays}/${totalWorkingDaysThisMonth}\nPresent Days: ${data.presentDays}\nShort Leave: ${data.shortLeaveDays}\nCalculated Salary: ${formatCurrency(data.calculatedSalary)}`;
+                              const csvContent = `Employee: ${data.employeeName}\nPosition: ${data.rank}\nMonthly Salary: ${formatCurrency(data.monthlySalary)}\nDaily Rate: ${formatCurrency(data.dailyRate)}\nWorking Days: ${data.actualWorkingDays}/${totalWorkingDaysThisMonth}\nPresent Days: ${data.presentDays}\nShort Leave: ${data.shortLeaveDays}\nCalculated Salary: ${formatCurrency(data.calculatedSalary)}`;
                               const blob = new Blob([csvContent], { type: 'text/plain' });
                               const url = URL.createObjectURL(blob);
                               const link = document.createElement('a');
                               link.href = url;
-                              link.download = `payslip-${data.employee.name}-${currentMonthName.replace(' ', '-')}.txt`;
+                              link.download = `payslip-${data.employeeName}-${currentMonthName.replace(' ', '-')}.txt`;
                               link.click();
                               URL.revokeObjectURL(url);
                             }}
@@ -505,7 +425,7 @@ export default function SalaryPage() {
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-white/60">Monthly Salary:</span>
-                            <span>{formatCurrency(Number(data.employee.wage_rate))}</span>
+                            <span>{formatCurrency(data.monthlySalary)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-white/60">Daily Rate:</span>
