@@ -13,11 +13,11 @@ export default function Dashboard({ children, title }: DashboardProps) {
     <div className="min-h-screen flex bg-adicorp-dark">
       <Sidebar />
       
-      <div className="flex-1 ml-64">
+      <div className="flex-1 ml-64 min-h-screen flex flex-col">
         <Header title={title} />
         
-        <main className="p-6">
-          <div className="animate-fade-in">
+        <main className="flex-1 p-6 overflow-auto">
+          <div className="animate-fade-in max-w-full">
             {children}
           </div>
         </main>
