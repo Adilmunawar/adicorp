@@ -254,15 +254,15 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
         className="
           max-w-lg w-full rounded-xl shadow-lg
           bg-adicorp-dark-light border-white/10
-          max-h-[90vh] overflow-y-auto
           flex flex-col justify-center items-center
-          m-0
+          p-0 m-0
         "
         style={{
           left: '50%',
           top: '50%',
           transform: 'translate(-50%, -50%)',
-          position: 'fixed'
+          position: 'fixed',
+          maxHeight: '90vh',
         }}
       >
         <DialogHeader className="w-full px-6 pb-2">
@@ -275,7 +275,13 @@ export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFo
               : "Enter employee details to add them to your team"}
           </DialogDescription>
         </DialogHeader>
-        <div className="w-full px-6 pt-2 pb-6">
+        <div
+          className="w-full px-6 pt-2 pb-6"
+          style={{
+            overflowY: "auto",
+            maxHeight: "calc(90vh - 80px)",
+          }}
+        >
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
               <FormField
