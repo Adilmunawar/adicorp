@@ -17,7 +17,8 @@ import {
   ChevronDown,
   Loader2,
   RefreshCcw,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -42,6 +43,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import EmployeeImportExport from "./EmployeeImportExport";
 
 interface EmployeeListProps {
   onAddEmployee: () => void;
@@ -52,6 +55,7 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
   const { toast } = useToast();
   const { user, session, userProfile } = useAuth();
@@ -186,142 +190,169 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
   const showNoCompanyMessage = session && user && userProfile && !userProfile.company_id;
 
   return (
-    <Card className="glass-card w-full">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div className="space-y-1">
-          <CardTitle className="flex items-center">
-            <span>All Employees</span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="ml-2" 
-              onClick={() => fetchEmployees()}
-            >
-              <RefreshCcw className="h-4 w-4" />
-            </Button>
-          </CardTitle>
-          <CardDescription>
-            Manage your workforce and team members
-          </CardDescription>
-        </div>
-        <Button 
-          onClick={onAddEmployee}
-          className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-        >
-          <UserPlus className="mr-2 h-4 w-4" />
-          Add Employee
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex justify-center items-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
-          </div>
-        ) : showNoCompanyMessage ? (
-          <div className="text-center py-8">
-            <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Company Setup Required</h3>
-            <p className="text-white/70 mb-4">You need to set up your company before you can add employees.</p>
-            <Button 
-              variant="default"
-              className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-              onClick={() => window.location.href = '/settings'}
-            >
-              Go to Company Setup
-            </Button>
-          </div>
-        ) : employees.length === 0 ? (
-          <div className="text-center py-8 text-white/70">
-            <p>No employees found. Add your first employee to get started.</p>
-          </div>
-        ) : (
-          <div className="rounded-md overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/10 hover:bg-transparent">
-                  <TableHead>Name</TableHead>
-                  <TableHead>Rank</TableHead>
-                  <TableHead>Daily Wage</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {employees.map((employee) => (
-                  <TableRow 
-                    key={employee.id} 
-                    className="border-white/10 hover:bg-adicorp-dark/30"
-                  >
-                    <TableCell>{employee.name}</TableCell>
-                    <TableCell>{employee.rank}</TableCell>
-                    <TableCell>{formatCurrency(Number(employee.wage_rate))}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={employee.status === "active" ? "default" : "secondary"}
-                        className={
-                          employee.status === "active" 
-                            ? "bg-green-500/20 text-green-400" 
-                            : "bg-red-500/20 text-red-400"
-                        }
-                      >
-                        {employee.status === "active" ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onEditEmployee(employee.id)}
-                        >
-                          <Edit size={16} />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <ChevronDown size={16} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-adicorp-dark-light border-white/10">
-                            <DropdownMenuItem 
-                              className="text-red-400 focus:text-red-400 cursor-pointer"
-                              onClick={() => confirmDelete(employee.id)}
-                            >
-                              <Trash size={16} className="mr-2" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-        
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent className="bg-adicorp-dark-light border-white/10">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action will permanently delete this employee and cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="bg-transparent border-white/10 hover:bg-adicorp-dark">
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteEmployee}
-                className="bg-red-500/20 text-red-400 hover:bg-red-500/30"
+    <>
+      <Card className="glass-card w-full">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center">
+              <span>All Employees</span>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="ml-2" 
+                onClick={() => fetchEmployees()}
               >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </CardContent>
-    </Card>
+                <RefreshCcw className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+            <CardDescription>
+              Manage your workforce and team members
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => setImportExportDialogOpen(true)}
+              className="border-white/20 hover:bg-adicorp-dark/30"
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Import/Export
+            </Button>
+            <Button 
+              onClick={onAddEmployee}
+              className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add Employee
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-adicorp-purple" />
+            </div>
+          ) : showNoCompanyMessage ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Company Setup Required</h3>
+              <p className="text-white/70 mb-4">You need to set up your company before you can add employees.</p>
+              <Button 
+                variant="default"
+                className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                onClick={() => window.location.href = '/settings'}
+              >
+                Go to Company Setup
+              </Button>
+            </div>
+          ) : employees.length === 0 ? (
+            <div className="text-center py-8 text-white/70">
+              <p>No employees found. Add your first employee to get started.</p>
+            </div>
+          ) : (
+            <div className="rounded-md overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/10 hover:bg-transparent">
+                    <TableHead>Name</TableHead>
+                    <TableHead>Rank</TableHead>
+                    <TableHead>Daily Wage</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {employees.map((employee) => (
+                    <TableRow 
+                      key={employee.id} 
+                      className="border-white/10 hover:bg-adicorp-dark/30"
+                    >
+                      <TableCell>{employee.name}</TableCell>
+                      <TableCell>{employee.rank}</TableCell>
+                      <TableCell>{formatCurrency(Number(employee.wage_rate))}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={employee.status === "active" ? "default" : "secondary"}
+                          className={
+                            employee.status === "active" 
+                              ? "bg-green-500/20 text-green-400" 
+                              : "bg-red-500/20 text-red-400"
+                          }
+                        >
+                          {employee.status === "active" ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onEditEmployee(employee.id)}
+                          >
+                            <Edit size={16} />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <ChevronDown size={16} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-adicorp-dark-light border-white/10">
+                              <DropdownMenuItem 
+                                className="text-red-400 focus:text-red-400 cursor-pointer"
+                                onClick={() => confirmDelete(employee.id)}
+                              >
+                                <Trash size={16} className="mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogContent className="bg-adicorp-dark-light border-white/10">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action will permanently delete this employee and cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="bg-transparent border-white/10 hover:bg-adicorp-dark">
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteEmployee}
+                  className="bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
+
+      <Dialog open={importExportDialogOpen} onOpenChange={setImportExportDialogOpen}>
+        <DialogContent className="bg-adicorp-dark-light border-white/10 max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import/Export Employees</DialogTitle>
+          </DialogHeader>
+          <EmployeeImportExport 
+            onImportComplete={() => {
+              fetchEmployees();
+              setImportExportDialogOpen(false);
+            }}
+            employees={employees}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
