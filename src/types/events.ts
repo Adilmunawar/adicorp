@@ -4,8 +4,9 @@ export interface EventRow {
   company_id: string;
   title: string;
   date: string;
-  type: 'holiday' | 'working_day' | 'half_day';
+  type: 'holiday' | 'working_day' | 'half_day' | 'off_day' | 'meeting' | 'training';
   description?: string;
+  affects_attendance: boolean;
   created_at: string;
 }
 
