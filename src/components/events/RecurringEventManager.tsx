@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +46,17 @@ const INTERNATIONAL_HOLIDAYS = {
     { name: 'Canada Day', date: '07-01', type: 'holiday' },
     { name: 'Christmas Day', date: '12-25', type: 'holiday' },
     { name: 'Boxing Day', date: '12-26', type: 'holiday' },
+  ],
+  'PK': [
+    { name: 'New Year\'s Day', date: '01-01', type: 'holiday' },
+    { name: 'Kashmir Day', date: '02-05', type: 'holiday' },
+    { name: 'Pakistan Day', date: '03-23', type: 'holiday' },
+    { name: 'Labour Day', date: '05-01', type: 'holiday' },
+    { name: 'Independence Day', date: '08-14', type: 'holiday' },
+    { name: 'Iqbal Day', date: '11-09', type: 'holiday' },
+    { name: 'Quaid-e-Azam Birthday', date: '12-25', type: 'holiday' },
+    { name: 'Eid-ul-Fitr', date: 'lunar-calendar', type: 'holiday' },
+    { name: 'Eid-ul-Adha', date: 'lunar-calendar', type: 'holiday' },
   ]
 };
 
@@ -160,6 +170,7 @@ export default function RecurringEventManager() {
                   <SelectItem value="UK">🇬🇧 United Kingdom</SelectItem>
                   <SelectItem value="IN">🇮🇳 India</SelectItem>
                   <SelectItem value="CA">🇨🇦 Canada</SelectItem>
+                  <SelectItem value="PK">🇵🇰 Pakistan</SelectItem>
                 </SelectContent>
               </Select>
             </div>
