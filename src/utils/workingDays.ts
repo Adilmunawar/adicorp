@@ -85,7 +85,7 @@ export const getWorkingDatesInMonth = async (date: Date, companyId: string): Pro
     }
 
     if (data && data.length > 0 && data[0].working_dates) {
-      return data[0].working_dates.map((d: Date) => format(d, 'yyyy-MM-dd'));
+      return data[0].working_dates.map((dateStr: string) => format(new Date(dateStr), 'yyyy-MM-dd'));
     }
 
     return [];

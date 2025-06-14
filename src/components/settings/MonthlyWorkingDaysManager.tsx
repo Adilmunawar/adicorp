@@ -2,12 +2,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
-import { Calendar, ChevronLeft, ChevronRight, Save, RotateCcw } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth } from "date-fns";
+import { CalendarDays, Save } from "lucide-react";
 
 interface MonthlyConfig {
   id?: string;
@@ -16,312 +18,189 @@ interface MonthlyConfig {
   working_days_count: number;
   daily_rate_divisor: number;
   configuration: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export default function MonthlyWorkingDaysManager() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [monthlyConfig, setMonthlyConfig] = useState<MonthlyConfig | null>(null);
-  const [workingDates, setWorkingDates] = useState<Set<string>>(new Set());
-  const [companySettings, setCompanySettings] = useState<any>(null);
+  const [workingDaysCount, setWorkingDaysCount] = useState(22);
+  const [dailyRateDivisor, setDailyRateDivisor] = useState(26);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const { userProfile } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     if (userProfile?.company_id) {
-      fetchMonthData();
+      fetchMonthlyConfig();
     }
-  }, [userProfile?.company_id, currentMonth]);
+  }, [selectedMonth, userProfile?.company_id]);
 
-  const fetchMonthData = async () => {
+  const fetchMonthlyConfig = async () => {
+    if (!userProfile?.company_id) return;
+
     try {
-      setLoading(true);
-      const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-
-      // Fetch company settings
-      const { data: settings } = await supabase
-        .from('company_working_settings')
-        .select('*')
-        .eq('company_id', userProfile?.company_id)
-        .maybeSingle();
-
-      setCompanySettings(settings);
-
-      // Fetch monthly configuration
-      const { data: config } = await supabase
+      const monthKey = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+      const { data, error } = await supabase
         .from('monthly_working_days')
         .select('*')
-        .eq('company_id', userProfile?.company_id)
-        .eq('month', monthStart)
+        .eq('company_id', userProfile.company_id)
+        .eq('month', monthKey)
         .maybeSingle();
 
-      setMonthlyConfig(config);
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error fetching monthly config:", error);
+        return;
+      }
 
-      // Calculate default working dates
-      await calculateWorkingDates(settings, config);
+      if (data) {
+        const config: MonthlyConfig = {
+          ...data,
+          configuration: typeof data.configuration === 'string' 
+            ? JSON.parse(data.configuration) 
+            : data.configuration || {}
+        };
+        setMonthlyConfig(config);
+        setWorkingDaysCount(config.working_days_count);
+        setDailyRateDivisor(config.daily_rate_divisor);
+      } else {
+        setMonthlyConfig(null);
+        setWorkingDaysCount(22);
+        setDailyRateDivisor(26);
+      }
     } catch (error) {
-      console.error("Error fetching month data:", error);
+      console.error("Error fetching monthly config:", error);
+    }
+  };
+
+  const saveMonthlyConfig = async () => {
+    if (!userProfile?.company_id) return;
+
+    setLoading(true);
+    try {
+      const monthKey = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+      const configData = {
+        company_id: userProfile.company_id,
+        month: monthKey,
+        working_days_count: workingDaysCount,
+        daily_rate_divisor: dailyRateDivisor,
+        configuration: {}
+      };
+
+      const { error } = await supabase
+        .from('monthly_working_days')
+        .upsert(configData, { 
+          onConflict: 'company_id,month' 
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Monthly Configuration Saved",
+        description: `Working days configuration for ${format(selectedMonth, 'MMMM yyyy')} has been updated.`,
+      });
+
+      fetchMonthlyConfig();
+    } catch (error: any) {
+      console.error("Error saving monthly config:", error);
+      toast({
+        title: "Error saving configuration",
+        description: error.message || "Failed to save monthly working days configuration.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateWorkingDates = async (settings: any, config: MonthlyConfig | null) => {
-    const defaultSettings = settings || {
-      weekend_saturday: false,
-      weekend_sunday: true,
-    };
-
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-    const allDates = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    const workingDatesSet = new Set<string>();
-
-    // Fetch events that affect attendance
-    const { data: events } = await supabase
-      .from('events')
-      .select('date, type, affects_attendance')
-      .eq('company_id', userProfile?.company_id)
-      .gte('date', format(monthStart, 'yyyy-MM-dd'))
-      .lte('date', format(monthEnd, 'yyyy-MM-dd'));
-
-    const offDayEvents = new Set(
-      events?.filter(e => e.affects_attendance && ['holiday', 'off_day'].includes(e.type))
-        .map(e => e.date) || []
-    );
-
-    allDates.forEach(date => {
-      const dayOfWeek = getDay(date); // 0=Sunday, 6=Saturday
-      const dateStr = format(date, 'yyyy-MM-dd');
-      let isWorkingDay = true;
-
-      // Check weekends
-      if (dayOfWeek === 0 && defaultSettings.weekend_sunday) {
-        isWorkingDay = false;
-      }
-      if (dayOfWeek === 6 && !defaultSettings.weekend_saturday) {
-        isWorkingDay = false;
-      }
-
-      // Check events
-      if (offDayEvents.has(dateStr)) {
-        isWorkingDay = false;
-      }
-
-      // Apply monthly configuration overrides
-      if (config?.configuration && config.configuration[dateStr] !== undefined) {
-        isWorkingDay = config.configuration[dateStr];
-      }
-
-      if (isWorkingDay) {
-        workingDatesSet.add(dateStr);
-      }
-    });
-
-    setWorkingDates(workingDatesSet);
-  };
-
-  const toggleDate = (dateStr: string) => {
-    setWorkingDates(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(dateStr)) {
-        newSet.delete(dateStr);
-      } else {
-        newSet.add(dateStr);
-      }
-      return newSet;
-    });
-  };
-
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-      
-      // Convert working dates to configuration object
-      const configuration: Record<string, boolean> = {};
-      const monthDates = eachDayOfInterval({
-        start: startOfMonth(currentMonth),
-        end: endOfMonth(currentMonth)
-      });
-
-      monthDates.forEach(date => {
-        const dateStr = format(date, 'yyyy-MM-dd');
-        configuration[dateStr] = workingDates.has(dateStr);
-      });
-
-      const configData = {
-        company_id: userProfile?.company_id,
-        month: monthStart,
-        working_days_count: workingDates.size,
-        daily_rate_divisor: 26, // Always 26 as per requirement
-        configuration,
-      };
-
-      const { error } = await supabase
-        .from('monthly_working_days')
-        .upsert(configData, { onConflict: 'company_id,month' });
-
-      if (error) throw error;
-
-      toast({
-        title: "Configuration Saved",
-        description: `Working days for ${format(currentMonth, 'MMMM yyyy')} have been updated.`,
-      });
-
-      await fetchMonthData(); // Refresh data
-    } catch (error) {
-      console.error("Error saving configuration:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save working days configuration.",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleReset = () => {
-    fetchMonthData(); // Reset to original configuration
-  };
-
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const allDates = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
-  // Group dates by weeks
-  const weeks: Date[][] = [];
-  let currentWeek: Date[] = [];
-
-  allDates.forEach(date => {
-    if (getDay(date) === 0 && currentWeek.length > 0) {
-      weeks.push(currentWeek);
-      currentWeek = [];
-    }
-    currentWeek.push(date);
-  });
-  if (currentWeek.length > 0) {
-    weeks.push(currentWeek);
-  }
-
   return (
     <Card className="glass-card">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-adicorp-purple" />
-            Monthly Working Days Manager
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="border-white/10 hover:bg-adicorp-dark"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-lg font-semibold px-4">
-              {format(currentMonth, 'MMMM yyyy')}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="border-white/10 hover:bg-adicorp-dark"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+        <CardTitle className="flex items-center">
+          <CalendarDays className="h-5 w-5 mr-2" />
+          Monthly Working Days Manager
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Badge variant="secondary" className="bg-green-500/20 text-green-400">
-              Working Days: {workingDates.size}
-            </Badge>
-            <Badge variant="secondary" className="bg-blue-500/20 text-blue-400">
-              Daily Rate: Salary ÷ 26
-            </Badge>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Calendar for month selection */}
+          <div>
+            <Label className="text-sm text-white/60 mb-2 block">Select Month</Label>
+            <Calendar
+              mode="single"
+              selected={selectedMonth}
+              onSelect={(date) => date && setSelectedMonth(date)}
+              className="rounded-md border border-white/10 bg-adicorp-dark/50"
+            />
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-              className="border-white/10 hover:bg-adicorp-dark"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
-          </div>
-        </div>
 
-        {loading ? (
-          <div className="text-center py-8 text-white/60">Loading calendar...</div>
-        ) : (
-          <div className="space-y-2">
-            {/* Calendar Header */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="text-center text-sm font-medium text-white/60 p-2">
-                  {day}
-                </div>
-              ))}
+          {/* Configuration form */}
+          <div className="space-y-4">
+            <div>
+              <Label className="text-white/80">Selected Month</Label>
+              <p className="text-xl font-semibold">
+                {format(selectedMonth, 'MMMM yyyy')}
+              </p>
             </div>
 
-            {/* Calendar Body */}
-            {weeks.map((week, weekIndex) => (
-              <div key={weekIndex} className="grid grid-cols-7 gap-1">
-                {Array.from({ length: 7 }, (_, dayIndex) => {
-                  const date = week.find(d => getDay(d) === dayIndex);
-                  if (!date) {
-                    return <div key={dayIndex} className="p-2" />;
-                  }
-
-                  const dateStr = format(date, 'yyyy-MM-dd');
-                  const isWorkingDay = workingDates.has(dateStr);
-                  const isToday = isSameDay(date, new Date());
-
-                  return (
-                    <button
-                      key={dayIndex}
-                      onClick={() => toggleDate(dateStr)}
-                      className={`
-                        p-2 text-sm rounded-lg border transition-all
-                        ${isWorkingDay 
-                          ? 'bg-green-500/20 border-green-500/40 text-green-300' 
-                          : 'bg-red-500/10 border-red-500/20 text-red-300'
-                        }
-                        ${isToday ? 'ring-2 ring-adicorp-purple' : ''}
-                        hover:scale-105 hover:shadow-md
-                      `}
-                    >
-                      {format(date, 'd')}
-                    </button>
-                  );
-                })}
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="workingDays" className="text-white/80">
+                  Working Days Count
+                </Label>
+                <Input
+                  id="workingDays"
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={workingDaysCount}
+                  onChange={(e) => setWorkingDaysCount(parseInt(e.target.value))}
+                  className="bg-adicorp-dark/50 border-white/10"
+                />
+                <p className="text-xs text-white/60 mt-1">
+                  Total working days for this month
+                </p>
               </div>
-            ))}
-          </div>
-        )}
 
-        <div className="text-xs text-white/60 space-y-1">
-          <p>• Click on any date to toggle between working day (green) and off day (red)</p>
-          <p>• Green dates will appear in attendance marking</p>
-          <p>• Red dates (holidays, Eid, etc.) will be excluded from attendance</p>
-          <p>• Daily rate is always calculated as: Monthly Salary ÷ 26</p>
+              <div>
+                <Label htmlFor="divisor" className="text-white/80">
+                  Daily Rate Divisor
+                </Label>
+                <Input
+                  id="divisor"
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={dailyRateDivisor}
+                  onChange={(e) => setDailyRateDivisor(parseInt(e.target.value))}
+                  className="bg-adicorp-dark/50 border-white/10"
+                />
+                <p className="text-xs text-white/60 mt-1">
+                  Number to divide monthly salary by for daily rate (typically 26)
+                </p>
+              </div>
+
+              <Button 
+                onClick={saveMonthlyConfig}
+                disabled={loading}
+                className="w-full bg-adicorp-purple hover:bg-adicorp-purple-dark"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {loading ? "Saving..." : "Save Configuration"}
+              </Button>
+            </div>
+
+            {monthlyConfig && (
+              <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-sm text-green-400">
+                  ✓ Custom configuration exists for this month
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

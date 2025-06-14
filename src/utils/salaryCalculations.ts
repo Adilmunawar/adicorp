@@ -1,5 +1,5 @@
 
-import { getDailyRateDivisor } from "./workingDays";
+import { getDailyRateDivisor, getWorkingDaysInMonth } from "./workingDays";
 
 export interface SalaryCalculation {
   totalWorkingDays: number;
@@ -31,6 +31,9 @@ export const calculateEmployeeSalary = async (
     calculatedSalary
   };
 };
+
+// Export alias for backward compatibility
+export const getWorkingDaysInMonthForSalary = getWorkingDaysInMonth;
 
 // Format currency for display
 export const formatCurrency = (amount: number): string => {
