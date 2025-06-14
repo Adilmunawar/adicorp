@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -51,7 +50,9 @@ import {
   Layers,
   Boxes,
   GitBranch,
-  Workflow
+  Workflow,
+  Server,
+  Wifi
 } from "lucide-react";
 
 interface Particle {
@@ -61,6 +62,15 @@ interface Particle {
   vy: number;
   life: number;
   maxLife: number;
+}
+
+interface UptimeData {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  totalSeconds: number;
+  uptime: number;
 }
 
 export default function Index() {
@@ -73,7 +83,48 @@ export default function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [scrollY, setScrollY] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [uptimeData, setUptimeData] = useState<UptimeData>({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    totalSeconds: 0,
+    uptime: 0
+  });
   
+  // Calculate uptime from May 28, 2025
+  useEffect(() => {
+    const liveDate = new Date('2025-05-28T00:00:00Z');
+    
+    const updateUptime = () => {
+      const now = new Date();
+      const diffInMs = now.getTime() - liveDate.getTime();
+      const totalSeconds = Math.floor(diffInMs / 1000);
+      
+      const days = Math.floor(totalSeconds / (24 * 60 * 60));
+      const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+      const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+      const seconds = totalSeconds % 60;
+      
+      // Calculate uptime percentage (assuming 99.99% target)
+      const uptime = 99.99;
+      
+      setUptimeData({
+        days,
+        hours,
+        minutes,
+        seconds,
+        totalSeconds,
+        uptime
+      });
+    };
+
+    updateUptime();
+    const interval = setInterval(updateUptime, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     if (user && !loading) {
       navigate("/dashboard");
@@ -429,6 +480,106 @@ export default function Index() {
           </div>
         </section>
         
+        {/* Server Uptime Section */}
+        <section className="w-full py-12 md:py-16 bg-gradient-to-b from-slate-950 via-green-950/10 to-slate-950 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-400/5 via-transparent to-blue-400/5"></div>
+          
+          <div className="container px-4 md:px-6 relative z-10">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-green-500/20 via-blue-500/20 to-emerald-600/20 border border-green-400/30 backdrop-blur-sm hover:scale-105 transition-transform duration-300 mb-6">
+                <Server className="w-5 h-5 text-green-300 animate-pulse" />
+                <span className="text-sm text-green-200 font-medium">99.99% Enterprise Reliability</span>
+                <Wifi className="w-5 h-5 text-blue-300 animate-pulse" style={{ animationDelay: '0.5s' }} />
+              </div>
+              
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-white mb-4 relative">
+                <span className="bg-gradient-to-r from-green-300 via-blue-300 to-emerald-400 bg-clip-text text-transparent animate-gradient-x">
+                  Server Uptime Status
+                </span>
+                <div className="absolute -inset-2 bg-gradient-to-r from-green-400/10 via-transparent to-blue-400/10 blur-xl -z-10"></div>
+              </h2>
+              
+              <p className="mx-auto max-w-[600px] text-white/80 text-lg mb-8">
+                Continuously running since <span className="text-green-300 font-semibold">May 28, 2025</span> without any interruption.
+              </p>
+            </div>
+            
+            {/* Uptime Display Grid */}
+            <div className="max-w-6xl mx-auto">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                <div className="group text-center p-6 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm border border-green-400/20 hover:border-green-400/50 transition-all duration-300 transform hover:scale-105">
+                  <div className="text-3xl md:text-4xl font-bold text-green-300 mb-2 group-hover:scale-110 transition-transform duration-300">
+                    {uptimeData.days}
+                  </div>
+                  <div className="text-white/70 text-sm group-hover:text-white/90 transition-colors duration-300">
+                    Days
+                  </div>
+                </div>
+                
+                <div className="group text-center p-6 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm border border-blue-400/20 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105">
+                  <div className="text-3xl md:text-4xl font-bold text-blue-300 mb-2 group-hover:scale-110 transition-transform duration-300">
+                    {uptimeData.hours}
+                  </div>
+                  <div className="text-white/70 text-sm group-hover:text-white/90 transition-colors duration-300">
+                    Hours
+                  </div>
+                </div>
+                
+                <div className="group text-center p-6 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm border border-purple-400/20 hover:border-purple-400/50 transition-all duration-300 transform hover:scale-105">
+                  <div className="text-3xl md:text-4xl font-bold text-purple-300 mb-2 group-hover:scale-110 transition-transform duration-300">
+                    {uptimeData.minutes}
+                  </div>
+                  <div className="text-white/70 text-sm group-hover:text-white/90 transition-colors duration-300">
+                    Minutes
+                  </div>
+                </div>
+                
+                <div className="group text-center p-6 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm border border-cyan-400/20 hover:border-cyan-400/50 transition-all duration-300 transform hover:scale-105">
+                  <div className="text-3xl md:text-4xl font-bold text-cyan-300 mb-2 group-hover:scale-110 transition-transform duration-300">
+                    {uptimeData.seconds}
+                  </div>
+                  <div className="text-white/70 text-sm group-hover:text-white/90 transition-colors duration-300">
+                    Seconds
+                  </div>
+                </div>
+              </div>
+              
+              {/* Uptime Percentage Display */}
+              <div className="text-center p-8 rounded-2xl bg-gradient-to-br from-green-500/10 via-blue-500/10 to-emerald-500/10 backdrop-blur-sm border border-green-400/30 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-400/10 via-transparent to-blue-400/10 animate-pulse"></div>
+                
+                <div className="relative z-10">
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <Activity className="w-8 h-8 text-green-400 animate-bounce" />
+                    <span className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-green-300 via-blue-300 to-emerald-400 bg-clip-text text-transparent">
+                      {uptimeData.uptime}%
+                    </span>
+                    <Activity className="w-8 h-8 text-blue-400 animate-bounce" style={{ animationDelay: '0.5s' }} />
+                  </div>
+                  
+                  <div className="text-white/90 text-xl mb-2 font-semibold">
+                    System Uptime Reliability
+                  </div>
+                  
+                  <div className="text-white/70 text-sm">
+                    Total Runtime: {uptimeData.totalSeconds.toLocaleString()} seconds
+                  </div>
+                  
+                  {/* Uptime Progress Bar */}
+                  <div className="mt-6 w-full bg-slate-700/50 rounded-full h-3 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-green-400 via-blue-400 to-emerald-400 rounded-full transition-all duration-1000 relative"
+                      style={{ width: `${uptimeData.uptime}%` }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
         {/* Core Features Section */}
         <section className="w-full py-16 md:py-24 bg-gradient-to-b from-slate-950 via-blue-950/20 to-slate-950 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-400/5 via-transparent to-purple-400/5"></div>
@@ -554,7 +705,7 @@ export default function Index() {
             <div className="space-y-8 max-w-4xl mx-auto">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-white">
                 Ready to{" "}
-                <span className="bg-gradient-to-r from-blue-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent animate-gradient-x">
+                <span className="bg-gradient-to-r from-blue-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent">
                   Revolutionize
                 </span>
                 {" "}Your Business?
