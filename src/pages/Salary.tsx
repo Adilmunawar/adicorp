@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,12 +19,13 @@ import {
   Download,
   FileSpreadsheet,
   Briefcase,
-  Loader2
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeRow } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonthForSalary } from "@/utils/salaryCalculations";
 
@@ -37,18 +39,24 @@ interface EmployeeSalaryData {
   dailyRate: number;
 }
 
+interface SalaryStats {
+  totalBudgetSalary: number;
+  totalCalculatedSalary: number;
+  averageDailyRate: number;
+  employeeCount: number;
+}
+
 export default function SalaryPage() {
   const [employeeSalaryData, setEmployeeSalaryData] = useState<EmployeeSalaryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<SalaryStats>({
     totalBudgetSalary: 0,
     totalCalculatedSalary: 0,
     averageDailyRate: 0,
     employeeCount: 0,
   });
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState<null | string>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("salary-sheet");
@@ -57,23 +65,8 @@ export default function SalaryPage() {
   const currentMonth = new Date();
   const currentMonthName = format(currentMonth, "MMMM yyyy");
 
-  // Memoized calculations for better performance
-  const salaryStats = useMemo(() => {
-    const totalCalculatedSalary = employeeSalaryData.reduce((total, data) => total + data.calculatedSalary, 0);
-    const totalBudgetSalary = employeeSalaryData.reduce((total, data) => total + Number(data.employee.wage_rate), 0);
-    const averageDailyRate = employeeSalaryData.length > 0 
-      ? employeeSalaryData.reduce((total, data) => total + data.dailyRate, 0) / employeeSalaryData.length
-      : 0;
-    
-    return {
-      totalCalculatedSalary,
-      totalBudgetSalary,
-      averageDailyRate
-    };
-  }, [employeeSalaryData]);
-  
-  // NEW: batch processing logic for attendance => salary data
-  const fetchSalaryData = useCallback(async () => {
+  // Combined data fetching function
+  const fetchAllData = useCallback(async () => {
     try {
       if (!userProfile?.company_id) {
         setLoading(false);
@@ -81,7 +74,8 @@ export default function SalaryPage() {
       }
 
       setLoading(true);
-      console.log("Salary - Fetching salary data for company:", userProfile.company_id);
+      setError(null);
+      console.log("Salary - Fetching all data for company:", userProfile.company_id);
 
       const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
@@ -106,10 +100,10 @@ export default function SalaryPage() {
       ]);
 
       if (employeesResult.error) {
-        throw employeesResult.error;
+        throw new Error(`Failed to fetch employees: ${employeesResult.error.message}`);
       }
       if (attendanceResult.error && attendanceResult.error.code !== "PGRST116") {
-        throw attendanceResult.error;
+        throw new Error(`Failed to fetch attendance: ${attendanceResult.error.message}`);
       }
 
       const employees = employeesResult.data || [];
@@ -117,6 +111,12 @@ export default function SalaryPage() {
 
       if (employees.length === 0) {
         setEmployeeSalaryData([]);
+        setStats({
+          totalBudgetSalary: 0,
+          totalCalculatedSalary: 0,
+          averageDailyRate: 0,
+          employeeCount: 0,
+        });
         setLoading(false);
         return;
       }
@@ -132,7 +132,7 @@ export default function SalaryPage() {
         attendanceMap.get(att.employee_id).push(att);
       }
 
-      // Process salaries in parallel for all employees (faster for large data)
+      // Process salaries in parallel for all employees
       const salaryData: EmployeeSalaryData[] = await Promise.all(
         employees.map(async (employee) => {
           const attendance = attendanceMap.get(employee.id) || [];
@@ -170,13 +170,28 @@ export default function SalaryPage() {
         })
       );
 
+      // Calculate stats from the processed data
+      const totalCalculatedSalary = salaryData.reduce((total, data) => total + data.calculatedSalary, 0);
+      const totalBudgetSalary = salaryData.reduce((total, data) => total + Number(data.employee.wage_rate), 0);
+      const averageDailyRate = salaryData.length > 0 
+        ? salaryData.reduce((total, data) => total + data.dailyRate, 0) / salaryData.length
+        : 0;
+
       setEmployeeSalaryData(salaryData);
-      console.log("Salary - Processed salary data:", salaryData.length);
-    } catch (error) {
-      console.error("Salary - Error fetching salary data:", error);
+      setStats({
+        totalCalculatedSalary,
+        totalBudgetSalary,
+        averageDailyRate,
+        employeeCount: salaryData.length
+      });
+      
+      console.log("Salary - Successfully processed data:", salaryData.length);
+    } catch (error: any) {
+      console.error("Salary - Error fetching data:", error);
+      setError(error.message || "Failed to load salary data");
       toast({
         title: "Failed to load salary data",
-        description: "Please refresh and try again.",
+        description: error.message || "Please refresh and try again.",
         variant: "destructive",
       });
     } finally {
@@ -184,56 +199,13 @@ export default function SalaryPage() {
     }
   }, [userProfile?.company_id, currentMonth, toast]);
 
-  // Only server-side stats for cards!
-  const fetchSalaryStats = useCallback(async () => {
-    setStatsLoading(true);
-    setStatsError(null);
-    try {
-      if (!userProfile?.company_id) {
-        setStatsLoading(false);
-        return;
-      }
-      const { data, error } = await supabase.rpc("get_monthly_salary_stats", {
-        target_month: format(currentMonth, "yyyy-MM-dd"),
-        in_company_id: userProfile.company_id,
-      });
-      if (error) throw error;
-      if (data && data.length > 0) {
-        setStats({
-          totalCalculatedSalary: Number(data[0].total_calculated_salary),
-          totalBudgetSalary: Number(data[0].total_budget_salary),
-          averageDailyRate: Number(data[0].average_daily_rate),
-          employeeCount: Number(data[0].employee_count) ?? 0,
-        });
-      }
-    } catch (err: any) {
-      setStatsError(err.message || "Failed to load stats");
-    } finally {
-      setStatsLoading(false);
-    }
-  }, [userProfile?.company_id, currentMonth]);
-
-  // Fetch stats & salary data in parallel
   useEffect(() => {
-    fetchSalaryStats();
-    fetchSalaryData();
-  }, [fetchSalaryStats, fetchSalaryData]);
-
-  // Spinner timeout fallback for stats
-  useEffect(() => {
-    if (statsLoading) {
-      const timer = setTimeout(() => {
-        setStatsLoading(false);
-        setStatsError("Loading timed out. Please retry.");
-      }, 10000);
-      return () => clearTimeout(timer);
-    }
-  }, [statsLoading]);
+    fetchAllData();
+  }, [fetchAllData]);
 
   const handleDownload = useCallback(async (type: 'salary-sheet' | 'payslips') => {
     setDownloading(true);
     try {
-      // Create CSV content
       let csvContent = '';
       
       if (type === 'salary-sheet') {
@@ -248,7 +220,6 @@ export default function SalaryPage() {
         });
       }
       
-      // Download CSV
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
@@ -258,6 +229,7 @@ export default function SalaryPage() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
       toast({
         title: "Download completed",
@@ -274,8 +246,44 @@ export default function SalaryPage() {
       setDownloading(false);
     }
   }, [employeeSalaryData, currentMonthName, totalWorkingDaysThisMonth, toast]);
+
+  const handleRetry = () => {
+    fetchAllData();
+  };
+
+  if (!userProfile?.company_id) {
+    return (
+      <Dashboard title="Salary Management">
+        <div className="text-center py-8">
+          <p className="text-white/70">Please complete company setup to view salary data.</p>
+          <Button 
+            onClick={() => window.location.href = '/settings'}
+            className="mt-4 bg-adicorp-purple hover:bg-adicorp-purple-dark"
+          >
+            Go to Settings
+          </Button>
+        </div>
+      </Dashboard>
+    );
+  }
+
+  if (error && !loading) {
+    return (
+      <Dashboard title="Salary Management">
+        <div className="text-center py-8">
+          <p className="text-red-400 mb-4">{error}</p>
+          <Button 
+            onClick={handleRetry} 
+            className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Retry
+          </Button>
+        </div>
+      </Dashboard>
+    );
+  }
   
-  // Summary Card rendering (update to use new "stats")
   return (
     <Dashboard title="Salary Management">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -286,25 +294,24 @@ export default function SalaryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {statsLoading ? (
+            {loading ? (
               <Loader2 className="h-6 w-6 animate-spin text-green-400" />
-            ) : statsError ? (
-              <div className="text-xs text-red-400">{statsError}</div>
             ) : (
-              <div className="flex items-center">
-                <CircleDollarSign className="h-5 w-5 mr-2 text-green-400" />
-                <span className="text-2xl font-bold">
-                  {formatCurrency(stats.totalBudgetSalary)}
-                </span>
-              </div>
+              <>
+                <div className="flex items-center">
+                  <CircleDollarSign className="h-5 w-5 mr-2 text-green-400" />
+                  <span className="text-2xl font-bold">
+                    {formatCurrency(stats.totalBudgetSalary)}
+                  </span>
+                </div>
+                <p className="text-xs text-white/60 mt-1">
+                  For {stats.employeeCount} active employees
+                </p>
+              </>
             )}
-            {!statsLoading && !statsError &&
-              <p className="text-xs text-white/60 mt-1">
-                For {stats.employeeCount} active employees
-              </p>
-            }
           </CardContent>
         </Card>
+        
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white/60">
@@ -312,25 +319,24 @@ export default function SalaryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {statsLoading ? (
+            {loading ? (
               <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
-            ) : statsError ? (
-              <div className="text-xs text-red-400">{statsError}</div>
             ) : (
-              <div className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2 text-blue-400" />
-                <span className="text-2xl font-bold">
-                  {formatCurrency(stats.totalCalculatedSalary)}
-                </span>
-              </div>
+              <>
+                <div className="flex items-center">
+                  <Calendar className="h-5 w-5 mr-2 text-blue-400" />
+                  <span className="text-2xl font-bold">
+                    {formatCurrency(stats.totalCalculatedSalary)}
+                  </span>
+                </div>
+                <p className="text-xs text-white/60 mt-1">
+                  Based on actual attendance
+                </p>
+              </>
             )}
-            {!statsLoading && !statsError &&
-              <p className="text-xs text-white/60 mt-1">
-                Based on actual attendance
-              </p>
-            }
           </CardContent>
         </Card>
+        
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-white/60">
@@ -338,23 +344,21 @@ export default function SalaryPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {statsLoading ? (
+            {loading ? (
               <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
-            ) : statsError ? (
-              <div className="text-xs text-red-400">{statsError}</div>
             ) : (
-              <div className="flex items-center">
-                <Briefcase className="h-5 w-5 mr-2 text-purple-400" />
-                <span className="text-2xl font-bold">
-                  {formatCurrency(stats.averageDailyRate)}
-                </span>
-              </div>
+              <>
+                <div className="flex items-center">
+                  <Briefcase className="h-5 w-5 mr-2 text-purple-400" />
+                  <span className="text-2xl font-bold">
+                    {formatCurrency(stats.averageDailyRate)}
+                  </span>
+                </div>
+                <p className="text-xs text-white/60 mt-1">
+                  Per employee per working day
+                </p>
+              </>
             )}
-            {!statsLoading && !statsError &&
-              <p className="text-xs text-white/60 mt-1">
-                Per employee per working day
-              </p>
-            }
           </CardContent>
         </Card>
       </div>
@@ -490,6 +494,7 @@ export default function SalaryPage() {
                               link.href = url;
                               link.download = `payslip-${data.employee.name}-${currentMonthName.replace(' ', '-')}.txt`;
                               link.click();
+                              URL.revokeObjectURL(url);
                             }}
                           >
                             <Download className="h-4 w-4" />

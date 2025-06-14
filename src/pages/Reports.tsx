@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,14 +22,15 @@ import {
   TrendingUp,
   Loader2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EmployeeRow } from "@/types/supabase";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
-import { calculateEmployeeSalary, formatCurrency, getWorkingDaysInMonthForSalary } from "@/utils/salaryCalculations";
+import { calculateEmployeeSalary, formatCurrency } from "@/utils/salaryCalculations";
 
 interface AttendanceReport {
   employeeId: string;
@@ -44,73 +46,28 @@ interface AttendanceReport {
   calculatedSalary: number;
 }
 
+interface ReportStats {
+  totalCalculatedSalary: number;
+  totalEmployees: number;
+  averageAttendance: number;
+  totalWorkingDaysThisMonth: number;
+}
+
 export default function ReportsPage() {
-  const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [attendanceReport, setAttendanceReport] = useState<AttendanceReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [error, setError] = useState<string | null>(null);
-  const { userProfile } = useAuth();
-  const { toast } = useToast();
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState<string | null>(null);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<ReportStats>({
     totalCalculatedSalary: 0,
     totalEmployees: 0,
     averageAttendance: 0,
     totalWorkingDaysThisMonth: 0,
   });
+  const { userProfile } = useAuth();
+  const { toast } = useToast();
 
-  // Only fetch stats from server for summary cards
-  const fetchReportStats = useCallback(async () => {
-    setStatsLoading(true);
-    setStatsError(null);
-    try {
-      if (!userProfile?.company_id) {
-        setStatsLoading(false);
-        return;
-      }
-      const { data, error } = await supabase.rpc("get_monthly_salary_stats", {
-        target_month: format(currentMonth, "yyyy-MM-dd"),
-        in_company_id: userProfile.company_id,
-      });
-      if (error) throw error;
-      if (data && data.length > 0) {
-        setStats({
-          totalCalculatedSalary: Number(data[0].total_calculated_salary),
-          totalEmployees: Number(data[0].employee_count),
-          averageAttendance: 0, // calculated in report body if needed
-          totalWorkingDaysThisMonth: 22 // fallback for working days (could fetch from config table)
-        });
-      }
-    } catch (err: any) {
-      setStatsError(err.message || "Failed to load stats");
-    } finally {
-      setStatsLoading(false);
-    }
-  }, [userProfile?.company_id, currentMonth]);
-
-  // Memoized calculations for better performance
-  const reportStats = useMemo(() => {
-    const totalCalculatedSalary = attendanceReport.reduce((sum, report) => sum + report.calculatedSalary, 0);
-    const totalEmployees = attendanceReport.length;
-    const averageAttendance = totalEmployees > 0 
-      ? attendanceReport.reduce((sum, report) => sum + report.actualWorkingDays, 0) / totalEmployees
-      : 0;
-    const totalWorkingDaysThisMonth = attendanceReport.length > 0 
-      ? attendanceReport[0].totalWorkingDaysInMonth 
-      : 0;
-    
-    return {
-      totalCalculatedSalary,
-      totalEmployees,
-      averageAttendance,
-      totalWorkingDaysThisMonth
-    };
-  }, [attendanceReport]);
-
-  // PATCH: Efficient batched attendance processing for monthly reports
   const fetchReportsData = useCallback(async () => {
     try {
       setError(null);
@@ -121,6 +78,7 @@ export default function ReportsPage() {
       }
 
       setLoading(true);
+      console.log("Reports - Fetching data for company:", userProfile.company_id);
 
       const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
@@ -140,19 +98,28 @@ export default function ReportsPage() {
           .lte("date", monthEnd),
       ]);
 
-      if (employeeResult.error) throw new Error(employeeResult.error.message);
-      if (attendanceResult.error && attendanceResult.error.code !== "PGRST116") throw new Error(attendanceResult.error.message);
+      if (employeeResult.error) {
+        throw new Error(`Failed to fetch employees: ${employeeResult.error.message}`);
+      }
+      if (attendanceResult.error && attendanceResult.error.code !== "PGRST116") {
+        throw new Error(`Failed to fetch attendance: ${attendanceResult.error.message}`);
+      }
 
       const employeeData = employeeResult.data || [];
-      setEmployees(employeeData);
+      const attendanceData = attendanceResult.data || [];
 
       if (employeeData.length === 0) {
         setAttendanceReport([]);
+        setStats({
+          totalCalculatedSalary: 0,
+          totalEmployees: 0,
+          averageAttendance: 0,
+          totalWorkingDaysThisMonth: 22, // default
+        });
         setLoading(false);
         return;
       }
 
-      const attendanceData = attendanceResult.data || [];
       const employeeIds = employeeData.map((emp) => emp.id);
       const attendanceMap = new Map();
       for (const att of attendanceData) {
@@ -163,7 +130,7 @@ export default function ReportsPage() {
         attendanceMap.get(att.employee_id).push(att);
       }
 
-      // Batch process attendance to reports (parallel map), then set state
+      // Process attendance to reports
       const reportData: AttendanceReport[] = await Promise.all(
         employeeData.map(async (employee) => {
           const attendance = attendanceMap.get(employee.id) || [];
@@ -205,8 +172,25 @@ export default function ReportsPage() {
         })
       );
 
+      // Calculate stats from processed data
+      const totalCalculatedSalary = reportData.reduce((sum, report) => sum + report.calculatedSalary, 0);
+      const totalEmployees = reportData.length;
+      const averageAttendance = totalEmployees > 0 
+        ? reportData.reduce((sum, report) => sum + report.actualWorkingDays, 0) / totalEmployees
+        : 0;
+      const totalWorkingDaysThisMonth = reportData.length > 0 
+        ? reportData[0].totalWorkingDaysInMonth 
+        : 22;
+
       setAttendanceReport(reportData);
-      console.log("Reports - Processed attendance report:", reportData.length, "employees");
+      setStats({
+        totalCalculatedSalary,
+        totalEmployees,
+        averageAttendance,
+        totalWorkingDaysThisMonth
+      });
+
+      console.log("Reports - Successfully processed data:", reportData.length, "employees");
     } catch (error: any) {
       setError(error.message || "Failed to load reports data");
       toast({
@@ -220,19 +204,8 @@ export default function ReportsPage() {
   }, [userProfile?.company_id, currentMonth, toast]);
 
   useEffect(() => {
-    fetchReportStats();
     fetchReportsData();
-  }, [fetchReportStats, fetchReportsData]);
-
-  useEffect(() => {
-    if (statsLoading) {
-      const timer = setTimeout(() => {
-        setStatsLoading(false);
-        setStatsError("Loading timed out. Please retry.");
-      }, 10000);
-      return () => clearTimeout(timer);
-    }
-  }, [statsLoading]);
+  }, [fetchReportsData]);
 
   const handleDownload = useCallback(async (type: 'attendance' | 'salary') => {
     setDownloading(true);
@@ -242,9 +215,9 @@ export default function ReportsPage() {
       if (type === 'attendance') {
         csvContent = 'Employee,Position,Present Days,Short Leave,Leave Days,Actual Working Days,Performance\n';
         attendanceReport.forEach(report => {
-          const performance = report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.9) 
+          const performance = report.actualWorkingDays >= (stats.totalWorkingDaysThisMonth * 0.9) 
             ? "Excellent" 
-            : report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.7) 
+            : report.actualWorkingDays >= (stats.totalWorkingDaysThisMonth * 0.7) 
             ? "Good" 
             : "Needs Improvement";
           csvContent += `"${report.employeeName}","${report.rank}","${report.presentDays}","${report.shortLeaveDays}","${report.leaveDays}","${report.actualWorkingDays}","${performance}"\n`;
@@ -281,7 +254,7 @@ export default function ReportsPage() {
     } finally {
       setDownloading(false);
     }
-  }, [attendanceReport, reportStats.totalWorkingDaysThisMonth, currentMonth, toast]);
+  }, [attendanceReport, stats.totalWorkingDaysThisMonth, currentMonth, toast]);
 
   const handlePreviousMonth = () => {
     setCurrentMonth(prev => subMonths(prev, 1));
@@ -295,31 +268,9 @@ export default function ReportsPage() {
     setCurrentMonth(new Date());
   };
 
-  if (loading) {
-    return (
-      <Dashboard title="Reports">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-adicorp-purple mx-auto" />
-            <p className="mt-4 text-white/60">Loading reports...</p>
-          </div>
-        </div>
-      </Dashboard>
-    );
-  }
-
-  if (error) {
-    return (
-      <Dashboard title="Reports">
-        <div className="text-center py-8">
-          <p className="text-red-400 mb-4">{error}</p>
-          <Button onClick={fetchReportsData} className="bg-adicorp-purple hover:bg-adicorp-purple-dark">
-            Retry
-          </Button>
-        </div>
-      </Dashboard>
-    );
-  }
+  const handleRetry = () => {
+    fetchReportsData();
+  };
 
   if (!userProfile?.company_id) {
     return (
@@ -332,6 +283,36 @@ export default function ReportsPage() {
           >
             Go to Settings
           </Button>
+        </div>
+      </Dashboard>
+    );
+  }
+
+  if (error && !loading) {
+    return (
+      <Dashboard title="Reports">
+        <div className="text-center py-8">
+          <p className="text-red-400 mb-4">{error}</p>
+          <Button 
+            onClick={handleRetry} 
+            className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Retry
+          </Button>
+        </div>
+      </Dashboard>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Dashboard title="Reports">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-adicorp-purple mx-auto" />
+            <p className="mt-4 text-white/60">Loading reports...</p>
+          </div>
         </div>
       </Dashboard>
     );
@@ -385,16 +366,10 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {statsLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
-            ) : statsError ? (
-              <span className="text-xs text-red-400">{statsError}</span>
-            ) : (
-              <div className="flex items-center">
-                <Users className="h-5 w-5 mr-2 text-blue-400" />
-                <span className="text-2xl font-bold">{stats.totalEmployees}</span>
-              </div>
-            )}
+            <div className="flex items-center">
+              <Users className="h-5 w-5 mr-2 text-blue-400" />
+              <span className="text-2xl font-bold">{stats.totalEmployees}</span>
+            </div>
           </CardContent>
         </Card>
         
@@ -405,18 +380,12 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {statsLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-green-400" />
-            ) : statsError ? (
-              <span className="text-xs text-red-400">{statsError}</span>
-            ) : (
-              <div className="flex items-center">
-                <Clock className="h-5 w-5 mr-2 text-green-400" />
-                <span className="text-2xl font-bold">
-                  {stats.averageAttendance.toFixed(1)} days
-                </span>
-              </div>
-            )}
+            <div className="flex items-center">
+              <Clock className="h-5 w-5 mr-2 text-green-400" />
+              <span className="text-2xl font-bold">
+                {stats.averageAttendance.toFixed(1)} days
+              </span>
+            </div>
           </CardContent>
         </Card>
         
@@ -427,18 +396,12 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {statsLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
-            ) : statsError ? (
-              <span className="text-xs text-red-400">{statsError}</span>
-            ) : (
-              <div className="flex items-center">
-                <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
-                <span className="text-2xl font-bold">
-                  {formatCurrency(stats.totalCalculatedSalary)}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center">
+              <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
+              <span className="text-2xl font-bold">
+                {formatCurrency(stats.totalCalculatedSalary)}
+              </span>
+            </div>
           </CardContent>
         </Card>
         
@@ -449,18 +412,12 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {statsLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-orange-400" />
-            ) : statsError ? (
-              <span className="text-xs text-red-400">{statsError}</span>
-            ) : (
-              <div className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2 text-orange-400" />
-                <span className="text-2xl font-bold">
-                  {stats.totalWorkingDaysThisMonth} days
-                </span>
-              </div>
-            )}
+            <div className="flex items-center">
+              <Calendar className="h-5 w-5 mr-2 text-orange-400" />
+              <span className="text-2xl font-bold">
+                {stats.totalWorkingDaysThisMonth} days
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -528,15 +485,15 @@ export default function ReportsPage() {
                           <TableCell>
                             <Badge 
                               className={
-                                report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.9)
+                                report.actualWorkingDays >= (stats.totalWorkingDaysThisMonth * 0.9)
                                   ? "bg-green-500/20 text-green-400"
-                                  : report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.7)
+                                  : report.actualWorkingDays >= (stats.totalWorkingDaysThisMonth * 0.7)
                                   ? "bg-yellow-500/20 text-yellow-400"
                                   : "bg-red-500/20 text-red-400"
                               }
                             >
-                              {report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.9) ? "Excellent" 
-                               : report.actualWorkingDays >= (reportStats.totalWorkingDaysThisMonth * 0.7) ? "Good" : "Needs Improvement"}
+                              {report.actualWorkingDays >= (stats.totalWorkingDaysThisMonth * 0.9) ? "Excellent" 
+                               : report.actualWorkingDays >= (stats.totalWorkingDaysThisMonth * 0.7) ? "Good" : "Needs Improvement"}
                             </Badge>
                           </TableCell>
                         </TableRow>
