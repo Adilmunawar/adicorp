@@ -1,11 +1,15 @@
 
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, ReactNode } from "react";
 import { toast } from "sonner";
 
-export const PrivateRoute = () => {
+interface PrivateRouteProps {
+  children: ReactNode;
+}
+
+export const PrivateRoute = ({ children }: PrivateRouteProps) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -31,5 +35,5 @@ export const PrivateRoute = () => {
     );
   }
 
-  return user ? <Outlet /> : <Navigate to="/auth" state={{ from: location }} replace />;
+  return user ? <>{children}</> : <Navigate to="/auth" state={{ from: location }} replace />;
 };
