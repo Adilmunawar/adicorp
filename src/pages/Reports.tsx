@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import Dashboard from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +27,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { format, addMonths, subMonths } from "date-fns";
-import { formatCurrency } from "@/utils/salaryCalculations";
+import { formatCurrencySync } from "@/utils/salaryCalculations";
 import { ReportDataService } from "@/services/reportDataService";
 
 interface AttendanceReport {
@@ -140,7 +139,7 @@ export default function ReportsPage() {
       } else {
         csvContent = 'Employee,Position,Monthly Salary,Daily Rate,Working Days,Calculated Salary,Status\n';
         attendanceReport.forEach(report => {
-          csvContent += `"${report.employeeName}","${report.rank}","${formatCurrency(report.monthlySalary)}","${formatCurrency(report.dailyRate)}","${report.actualWorkingDays}/${report.totalWorkingDaysInMonth}","${formatCurrency(report.calculatedSalary)}","Calculated"\n`;
+          csvContent += `"${report.employeeName}","${report.rank}","${formatCurrencySync(report.monthlySalary)}","${formatCurrencySync(report.dailyRate)}","${report.actualWorkingDays}/${report.totalWorkingDaysInMonth}","${formatCurrencySync(report.calculatedSalary)}","Calculated"\n`;
         });
       }
       
@@ -315,7 +314,7 @@ export default function ReportsPage() {
             <div className="flex items-center">
               <TrendingUp className="h-5 w-5 mr-2 text-purple-400" />
               <span className="text-2xl font-bold">
-                {formatCurrency(stats.totalCalculatedSalary)}
+                {formatCurrencySync(stats.totalCalculatedSalary)}
               </span>
             </div>
           </CardContent>
@@ -466,11 +465,11 @@ export default function ReportsPage() {
                         >
                           <TableCell className="font-medium">{report.employeeName}</TableCell>
                           <TableCell>{report.rank}</TableCell>
-                          <TableCell>{formatCurrency(report.monthlySalary)}</TableCell>
-                          <TableCell>{formatCurrency(report.dailyRate)}</TableCell>
+                          <TableCell>{formatCurrencySync(report.monthlySalary)}</TableCell>
+                          <TableCell>{formatCurrencySync(report.dailyRate)}</TableCell>
                           <TableCell>{report.actualWorkingDays} / {report.totalWorkingDaysInMonth}</TableCell>
                           <TableCell className="font-bold text-green-400">
-                            {formatCurrency(report.calculatedSalary)}
+                            {formatCurrencySync(report.calculatedSalary)}
                           </TableCell>
                           <TableCell>
                             <Badge className="bg-blue-500/20 text-blue-400">
