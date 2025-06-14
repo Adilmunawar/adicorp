@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Repeat, Globe, Clock } from "lucide-react";
+import { Calendar, Repeat, Globe, Clock, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -57,51 +58,171 @@ const INTERNATIONAL_HOLIDAYS = {
     { name: 'Quaid-e-Azam Birthday', date: '12-25', type: 'holiday' },
     { name: 'Eid-ul-Fitr', date: 'lunar-calendar', type: 'holiday' },
     { name: 'Eid-ul-Adha', date: 'lunar-calendar', type: 'holiday' },
+    { name: 'Muharram (Ashura)', date: 'lunar-calendar', type: 'holiday' },
+    { name: 'Mawlid un Nabi (Prophet\'s Birthday)', date: 'lunar-calendar', type: 'holiday' },
+    { name: 'Shab-e-Barat', date: 'lunar-calendar', type: 'holiday' },
+    { name: 'Shab-e-Qadr', date: 'lunar-calendar', type: 'holiday' },
+    { name: 'Chand Raat', date: 'lunar-calendar', type: 'holiday' },
   ]
 };
 
 export default function RecurringEventManager() {
   const [selectedCountry, setSelectedCountry] = useState<string>('US');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [recurringPattern, setRecurringPattern] = useState<RecurringPattern>({
     type: 'weekly',
     interval: 1,
   });
   const [loading, setLoading] = useState(false);
+  const [existingEvents, setExistingEvents] = useState<any[]>([]);
   const { userProfile } = useAuth();
   const { toast } = useToast();
+
+  // Fetch existing events to check for duplicates
+  const fetchExistingEvents = async () => {
+    if (!userProfile?.company_id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('company_id', userProfile.company_id)
+        .eq('type', 'holiday');
+
+      if (error) throw error;
+      setExistingEvents(data || []);
+    } catch (error) {
+      console.error('Error fetching existing events:', error);
+    }
+  };
+
+  const checkForDuplicates = (country: string, year: number) => {
+    const holidays = INTERNATIONAL_HOLIDAYS[country as keyof typeof INTERNATIONAL_HOLIDAYS] || [];
+    const duplicates = holidays.filter(holiday => {
+      if (holiday.date.includes('lunar') || holiday.date.includes('easter') || holiday.date.includes('thursday')) {
+        // For variable dates, check by name
+        return existingEvents.some(event => 
+          event.title === holiday.name && 
+          event.date.startsWith(year.toString())
+        );
+      } else {
+        // For fixed dates, check by exact date
+        const fullDate = `${year}-${holiday.date}`;
+        return existingEvents.some(event => 
+          event.date === fullDate || event.title === holiday.name
+        );
+      }
+    });
+    return duplicates;
+  };
 
   const handleImportHolidays = async (country: string, year: number) => {
     if (!userProfile?.company_id) return;
 
+    await fetchExistingEvents();
+    
+    const duplicates = checkForDuplicates(country, year);
+    if (duplicates.length > 0) {
+      toast({
+        title: "Duplicate Events Found",
+        description: `${duplicates.length} holidays already exist. Use "Remove Holidays" to clear duplicates first.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const holidays = INTERNATIONAL_HOLIDAYS[country as keyof typeof INTERNATIONAL_HOLIDAYS] || [];
-      const eventsToCreate = holidays.map(holiday => ({
-        title: holiday.name,
-        date: `${year}-${holiday.date}`,
-        type: 'holiday',
-        affects_attendance: true,
-        company_id: userProfile.company_id,
-        description: `${country} National Holiday`
-      }));
+      let successCount = 0;
+      let skippedCount = 0;
 
-      for (const event of eventsToCreate) {
-        if (!event.date.includes('easter') && !event.date.includes('lunar') && !event.date.includes('thursday')) {
+      for (const holiday of holidays) {
+        if (!holiday.date.includes('easter') && !holiday.date.includes('lunar') && !holiday.date.includes('thursday')) {
+          const eventData = {
+            title: holiday.name,
+            date: `${year}-${holiday.date}`,
+            type: 'holiday',
+            affects_attendance: true,
+            company_id: userProfile.company_id,
+            description: `${country} National Holiday - Imported ${new Date().toLocaleDateString()}`
+          };
+
           const { error } = await supabase
             .from('events')
-            .insert([event]);
+            .insert([eventData]);
           
-          if (error) console.error('Error inserting holiday:', error);
+          if (error) {
+            console.error('Error inserting holiday:', error);
+            skippedCount++;
+          } else {
+            successCount++;
+          }
+        } else {
+          // Handle lunar calendar and variable dates
+          const eventData = {
+            title: holiday.name,
+            date: `${year}-01-01`, // Placeholder date for lunar calendar events
+            type: 'holiday',
+            affects_attendance: true,
+            company_id: userProfile.company_id,
+            description: `${country} ${holiday.date.includes('lunar') ? 'Islamic' : 'Variable'} Holiday - Imported ${new Date().toLocaleDateString()} (Date TBD)`
+          };
+
+          const { error } = await supabase
+            .from('events')
+            .insert([eventData]);
+          
+          if (error) {
+            console.error('Error inserting holiday:', error);
+            skippedCount++;
+          } else {
+            successCount++;
+          }
         }
       }
 
       toast({
         title: "Holidays Imported",
-        description: `${country} holidays for ${year} have been imported successfully.`,
+        description: `${successCount} ${country} holidays for ${year} imported successfully.${skippedCount > 0 ? ` ${skippedCount} skipped due to errors.` : ''}`,
       });
     } catch (error: any) {
       toast({
         title: "Import Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveCountryHolidays = async (country: string, year: number) => {
+    if (!userProfile?.company_id) return;
+
+    setLoading(true);
+    try {
+      const holidays = INTERNATIONAL_HOLIDAYS[country as keyof typeof INTERNATIONAL_HOLIDAYS] || [];
+      const holidayNames = holidays.map(h => h.name);
+      
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('company_id', userProfile.company_id)
+        .eq('type', 'holiday')
+        .in('title', holidayNames)
+        .gte('date', `${year}-01-01`)
+        .lte('date', `${year}-12-31`);
+
+      if (error) throw error;
+
+      toast({
+        title: "Holidays Removed",
+        description: `${country} holidays for ${year} have been removed.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Remove Error",
         description: error.message,
         variant: "destructive",
       });
@@ -158,7 +279,7 @@ export default function RecurringEventManager() {
             <Calendar className="h-4 w-4 mr-2" />
             Import International Holidays
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label>Country/Region</Label>
               <Select value={selectedCountry} onValueChange={setSelectedCountry}>
@@ -174,19 +295,49 @@ export default function RecurringEventManager() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end">
+            <div>
+              <Label>Year</Label>
+              <Input
+                type="number"
+                min="2020"
+                max="2030"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="bg-adicorp-dark/50 border-white/10"
+              />
+            </div>
+            <div className="flex items-end gap-2">
               <Button 
-                onClick={() => handleImportHolidays(selectedCountry, new Date().getFullYear())}
+                onClick={() => handleImportHolidays(selectedCountry, selectedYear)}
                 disabled={loading}
-                className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
+                className="bg-adicorp-purple hover:bg-adicorp-purple-dark flex-1"
               >
-                Import {new Date().getFullYear()} Holidays
+                Import Holidays
+              </Button>
+              <Button 
+                onClick={() => handleRemoveCountryHolidays(selectedCountry, selectedYear)}
+                disabled={loading}
+                variant="outline"
+                className="border-red-500/20 hover:bg-red-500/10 text-red-400"
+              >
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
           <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <p className="text-sm text-blue-300">
-              Preview: {INTERNATIONAL_HOLIDAYS[selectedCountry as keyof typeof INTERNATIONAL_HOLIDAYS]?.length || 0} holidays will be imported for {selectedCountry}
+            <p className="text-sm text-blue-300 mb-2">
+              Preview: {INTERNATIONAL_HOLIDAYS[selectedCountry as keyof typeof INTERNATIONAL_HOLIDAYS]?.length || 0} holidays will be imported for {selectedCountry} {selectedYear}
+            </p>
+            {selectedCountry === 'PK' && (
+              <div className="flex items-center gap-2 text-xs text-yellow-300">
+                <AlertTriangle className="h-3 w-3" />
+                <span>Islamic holidays follow lunar calendar - exact dates will need manual adjustment</span>
+              </div>
+            )}
+          </div>
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+            <p className="text-sm text-amber-300">
+              💡 <strong>Tip:</strong> Use the trash button to remove previously imported holidays to avoid duplicates.
             </p>
           </div>
         </div>
@@ -252,6 +403,7 @@ export default function RecurringEventManager() {
                   <SelectItem value="America/Los_Angeles">PST (Pacific Standard Time)</SelectItem>
                   <SelectItem value="Europe/London">GMT (Greenwich Mean Time)</SelectItem>
                   <SelectItem value="Asia/Kolkata">IST (India Standard Time)</SelectItem>
+                  <SelectItem value="Asia/Karachi">PKT (Pakistan Standard Time)</SelectItem>
                   <SelectItem value="Asia/Shanghai">CST (China Standard Time)</SelectItem>
                 </SelectContent>
               </Select>
