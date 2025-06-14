@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { getWorkingDaysInMonth, getWorkingDatesInMonth, getDailyRateDivisor } from "@/utils/workingDays";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -123,7 +122,15 @@ class DataIntegrationService {
 
       if (error) throw error;
 
-      const attendance = data || [];
+      // Cast the data to match our AttendanceRecord interface
+      const attendance: AttendanceRecord[] = (data || []).map(record => ({
+        id: record.id,
+        employee_id: record.employee_id,
+        date: record.date,
+        status: record.status as 'present' | 'absent' | 'late' | 'short_leave',
+        created_at: record.created_at
+      }));
+
       this.setCache(cacheKey, attendance);
       return attendance;
     } catch (error) {
