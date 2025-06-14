@@ -1,14 +1,12 @@
 
 import Dashboard from "@/components/layout/Dashboard";
-import EventManager from "@/components/events/EventManager";
-import WorkingDaysConfig from "@/components/settings/WorkingDaysConfig";
+import AdvancedEventManager from "@/components/events/AdvancedEventManager";
 
 const EventsPage = () => {
   return (
-    <Dashboard title="Events & Calendar">
+    <Dashboard title="Events & Calendar Management">
       <div className="space-y-6">
-        <EventManager />
-        <WorkingDaysConfig />
+        <AdvancedEventManager />
       </div>
     </Dashboard>
   );

@@ -109,22 +109,23 @@ export const isWorkingDay = async (date: Date, companyId: string): Promise<boole
   }
 };
 
-// Get daily rate divisor (always 26 as per requirement)
+// Get daily rate divisor based on Saturday working status
 export const getDailyRateDivisor = async (companyId: string): Promise<number> => {
   try {
     const { data, error } = await supabase
       .from('company_working_settings')
-      .select('salary_divisor')
+      .select('weekend_saturday')
       .eq('company_id', companyId)
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
-      console.error("Error fetching salary divisor:", error);
+      console.error("Error fetching company settings:", error);
     }
 
-    return data?.salary_divisor || 26; // Default to 26
+    // If Saturday is a working day, divide by 26, otherwise by 22
+    return data?.weekend_saturday ? 26 : 22;
   } catch (error) {
     console.error("Error in getDailyRateDivisor:", error);
-    return 26; // Default to 26
+    return 22; // Default to 22 (Saturday off)
   }
 };

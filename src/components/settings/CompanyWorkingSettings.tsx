@@ -24,7 +24,7 @@ export default function CompanyWorkingSettings() {
     company_id: '',
     default_working_days_per_week: 5,
     default_working_days_per_month: 22,
-    salary_divisor: 26,
+    salary_divisor: 22,
     weekend_saturday: false,
     weekend_sunday: true,
   });
@@ -60,11 +60,23 @@ export default function CompanyWorkingSettings() {
 
   const handleWorkingDaysChange = (value: string) => {
     const workingDays = parseInt(value);
+    const saturdayWorking = workingDays === 6;
     setSettings(prev => ({
       ...prev,
       default_working_days_per_week: workingDays,
-      default_working_days_per_month: workingDays === 5 ? 22 : 26,
-      weekend_saturday: workingDays === 6,
+      default_working_days_per_month: saturdayWorking ? 26 : 22,
+      salary_divisor: saturdayWorking ? 26 : 22, // Dynamic divisor based on Saturday
+      weekend_saturday: saturdayWorking,
+    }));
+  };
+
+  const handleSaturdayChange = (checked: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      weekend_saturday: checked,
+      default_working_days_per_week: checked ? 6 : 5,
+      default_working_days_per_month: checked ? 26 : 22,
+      salary_divisor: checked ? 26 : 22, // Dynamic divisor
     }));
   };
 
@@ -90,7 +102,7 @@ export default function CompanyWorkingSettings() {
 
       toast({
         title: "Settings Saved",
-        description: "Company working settings have been updated.",
+        description: "Company working settings have been updated. Salary divisor is now " + (settings.weekend_saturday ? "26" : "22") + ".",
       });
     } catch (error) {
       console.error("Error saving settings:", error);
@@ -136,14 +148,7 @@ export default function CompanyWorkingSettings() {
               <Switch
                 id="saturday"
                 checked={settings.weekend_saturday}
-                onCheckedChange={(checked) => 
-                  setSettings(prev => ({ 
-                    ...prev, 
-                    weekend_saturday: checked,
-                    default_working_days_per_week: checked ? 6 : 5,
-                    default_working_days_per_month: checked ? 26 : 22,
-                  }))
-                }
+                onCheckedChange={handleSaturdayChange}
               />
             </div>
 
@@ -169,18 +174,20 @@ export default function CompanyWorkingSettings() {
                 Working Days per Month: <span className="text-white font-medium">{settings.default_working_days_per_month}</span>
               </p>
               <p className="text-sm text-white/70">
-                Daily Rate Calculation: <span className="text-white font-medium">Salary ÷ {settings.salary_divisor}</span>
+                Salary Divisor: <span className="text-white font-medium">{settings.salary_divisor}</span>
               </p>
             </div>
 
-            <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+            <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
               <div className="flex items-center gap-2 mb-2">
-                <Clock className="h-4 w-4 text-blue-400" />
-                <span className="font-medium text-blue-400">Important Note</span>
+                <Clock className="h-4 w-4 text-green-400" />
+                <span className="font-medium text-green-400">New Logic</span>
               </div>
-              <p className="text-xs text-blue-300">
-                Daily rate is always calculated by dividing salary by 26, regardless of actual working days. 
-                This ensures consistent salary calculations across different months.
+              <p className="text-xs text-green-300">
+                {settings.weekend_saturday 
+                  ? "Saturday is working day → Salary ÷ 26 for daily rate"
+                  : "Saturday is off → Salary ÷ 22 for daily rate"
+                }
               </p>
             </div>
           </div>

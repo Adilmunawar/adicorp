@@ -1,17 +1,16 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
-import Employees from "./pages/Employees";
-import Attendance from "./pages/Attendance";
-import Salary from "./pages/Salary";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
-import Auth from "./pages/Auth";
+import DashboardPage from "./pages/Dashboard";
+import EmployeesPage from "./pages/Employees";
+import AttendancePage from "./pages/Attendance";
+import SalaryPage from "./pages/Salary";
+import ReportsPage from "./pages/Reports";
+import SettingsPage from "./pages/Settings";
+import AuthPage from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./context/AuthContext";
 import { PrivateRoute } from "./components/layout/PrivateRoute";
@@ -28,39 +27,88 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => {
+function App() {
   useEffect(() => {
     console.log("App - Application initialized successfully");
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              
-              <Route element={<PrivateRoute />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/employees" element={<Employees />} />
-                <Route path="/attendance" element={<Attendance />} />
-                <Route path="/salary" element={<Salary />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/settings" element={<Settings />} />
-              </Route>
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <CompanySetupModal />
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <QueryClient client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route 
+              path="/dashboard" 
+              element={
+                <PrivateRoute>
+                  <DashboardPage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/employees" 
+              element={
+                <PrivateRoute>
+                  <EmployeesPage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/attendance" 
+              element={
+                <PrivateRoute>
+                  <AttendancePage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/salary" 
+              element={
+                <PrivateRoute>
+                  <SalaryPage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/reports" 
+              element={
+                <PrivateRoute>
+                  <ReportsPage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/events" 
+              element={
+                <PrivateRoute>
+                  <EventsPage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/working-days" 
+              element={
+                <PrivateRoute>
+                  <WorkingDaysPage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/settings" 
+              element={
+                <PrivateRoute>
+                  <SettingsPage />
+                </PrivateRoute>
+              } 
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClient>
   );
-};
+}
 
 export default App;

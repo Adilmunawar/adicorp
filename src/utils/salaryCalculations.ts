@@ -8,7 +8,7 @@ export interface SalaryCalculation {
   calculatedSalary: number;
 }
 
-// Calculate employee salary based on attendance with fixed divisor
+// Calculate employee salary based on attendance with dynamic divisor
 export const calculateEmployeeSalary = async (
   monthlySalary: number,
   presentDays: number,
@@ -16,7 +16,7 @@ export const calculateEmployeeSalary = async (
   currentMonth: Date,
   companyId: string
 ): Promise<SalaryCalculation> => {
-  // Always use 26 as divisor for daily rate calculation (as per requirement)
+  // Get dynamic divisor based on company settings (22 if Saturday off, 26 if Saturday working)
   const dailyRateDivisor = await getDailyRateDivisor(companyId);
   const dailyRate = monthlySalary / dailyRateDivisor;
   

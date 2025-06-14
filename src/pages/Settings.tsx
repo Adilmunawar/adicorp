@@ -2,12 +2,10 @@
 import Dashboard from "@/components/layout/Dashboard";
 import CompanySetupModal from "@/components/company/CompanySetupModal";
 import BackupManager from "@/components/backup/BackupManager";
-import CompanyWorkingSettings from "@/components/settings/CompanyWorkingSettings";
-import MonthlyWorkingDaysManager from "@/components/settings/MonthlyWorkingDaysManager";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import { Building2, User, Shield, Database } from "lucide-react";
+import { Building2, User, Shield, Calendar } from "lucide-react";
 
 export default function SettingsPage() {
   const { userProfile, user } = useAuth();
@@ -44,7 +42,17 @@ export default function SettingsPage() {
                     <p className="font-medium">{userProfile.companies.address || 'Not set'}</p>
                   </div>
                 </div>
-                <CompanySetupModal />
+                <div className="flex space-x-3">
+                  <CompanySetupModal />
+                  <Button 
+                    onClick={() => window.location.href = '/working-days'}
+                    variant="outline"
+                    className="border-white/10 hover:bg-adicorp-dark"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Manage Working Days
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="text-center py-8">
@@ -58,12 +66,6 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* Company Working Settings */}
-        {userProfile?.companies && <CompanyWorkingSettings />}
-
-        {/* Monthly Working Days Manager */}
-        {userProfile?.companies && <MonthlyWorkingDaysManager />}
 
         {/* User Information Section */}
         <Card className="glass-card">
