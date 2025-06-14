@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2 } from "lucide-react";
 import { formatCurrencySync } from "@/utils/salaryCalculations";
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface EmployeeSalaryData {
   employeeId: string;
@@ -36,6 +37,8 @@ export default function PayslipsGrid({
   onDownloadAll,
   onDownloadIndividual
 }: PayslipsGridProps) {
+  const { currency } = useCurrency();
+
   return (
     <Card className="glass-card">
       <CardHeader className="flex flex-row items-center justify-between">

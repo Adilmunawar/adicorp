@@ -39,6 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 import EmployeeForm from "./EmployeeForm";
 import EmployeeImportExport from "./EmployeeImportExport";
 import { formatCurrencySync } from "@/utils/salaryCalculations";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Employee {
   id: string;
@@ -66,6 +67,7 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
   const [showImportExport, setShowImportExport] = useState(false);
   const { userProfile } = useAuth();
   const { toast } = useToast();
+  const { currency } = useCurrency();
 
   useEffect(() => {
     if (userProfile?.company_id) {

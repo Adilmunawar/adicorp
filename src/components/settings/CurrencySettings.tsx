@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { BadgeDollarSign } from "lucide-react";
@@ -96,6 +96,8 @@ export default function CurrencySettings() {
 
       if (data?.currency) {
         setSelectedCurrency(data.currency);
+        // Sync with localStorage immediately
+        localStorage.setItem('app_currency', data.currency);
       }
     } catch (error) {
       console.error('Error fetching currency settings:', error);
@@ -117,14 +119,16 @@ export default function CurrencySettings() {
       const currency = CURRENCIES.find(c => c.code === selectedCurrency);
       toast({
         title: "Currency Updated",
-        description: `Currency has been changed to ${currency?.name} (${currency?.symbol}).`,
+        description: `Currency has been changed to ${currency?.name} (${currency?.symbol}). The page will reload to apply changes.`,
       });
 
-      // Update localStorage for immediate effect
+      // Update localStorage immediately
       localStorage.setItem('app_currency', selectedCurrency);
       
       // Trigger a page reload to update all currency displays
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Error saving currency:', error);
       toast({

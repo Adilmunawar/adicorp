@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Download, Loader2 } from "lucide-react";
 import { formatCurrencySync } from "@/utils/salaryCalculations";
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface EmployeeSalaryData {
   employeeId: string;
@@ -43,6 +44,8 @@ export default function SalarySheet({
   downloading,
   onDownload
 }: SalarySheetProps) {
+  const { currency } = useCurrency();
+
   return (
     <Card className="glass-card">
       <CardHeader className="flex flex-row items-center justify-between">

@@ -2,6 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CircleDollarSign, Calendar, Briefcase, Loader2 } from "lucide-react";
 import { formatCurrencySync } from "@/utils/salaryCalculations";
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface SalaryStats {
   totalBudgetSalary: number;
@@ -16,6 +17,8 @@ interface SalaryStatsProps {
 }
 
 export default function SalaryStats({ stats, loading }: SalaryStatsProps) {
+  const { currency } = useCurrency();
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <Card className="glass-card">

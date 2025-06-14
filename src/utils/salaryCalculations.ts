@@ -1,3 +1,4 @@
+
 import { dataIntegrationService } from "@/services/dataIntegrationService";
 import { getDailyRateDivisor } from "@/utils/workingDays";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +32,9 @@ const getCurrencySettings = async (companyId: string): Promise<{ code: string; l
         locale: storedCurrency === 'USD' ? 'en-US' : 'en-US'
       };
     }
+
+    // Update localStorage to match database
+    localStorage.setItem('app_currency', data.currency);
 
     // Map currency codes to locales
     const currencyLocaleMap: Record<string, string> = {
@@ -105,7 +109,7 @@ export const formatCurrency = async (amount: number, companyId?: string): Promis
     } else {
       // Fallback for when company ID is not available
       const storedCurrency = localStorage.getItem('app_currency') || 'USD';
-      currencySettings = { code: storedCurrency, locale: 'en-US' };
+      currencySettings = { code: storedCurrency, locale: getLocaleForCurrency(storedCurrency) };
     }
 
     return new Intl.NumberFormat(currencySettings.locale, {
@@ -126,10 +130,7 @@ export const formatCurrency = async (amount: number, companyId?: string): Promis
   }
 };
 
-// Simple synchronous version for immediate display
-export const formatCurrencySync = (amount: number): string => {
-  const storedCurrency = localStorage.getItem('app_currency') || 'USD';
-  
+const getLocaleForCurrency = (currencyCode: string): string => {
   const currencyLocaleMap: Record<string, string> = {
     'USD': 'en-US',
     'EUR': 'de-DE',
@@ -182,9 +183,16 @@ export const formatCurrencySync = (amount: number): string => {
     'TND': 'ar-TN',
     'DZD': 'ar-DZ',
   };
+  
+  return currencyLocaleMap[currencyCode] || 'en-US';
+};
 
+// Enhanced synchronous version that checks for updates
+export const formatCurrencySync = (amount: number): string => {
+  const storedCurrency = localStorage.getItem('app_currency') || 'USD';
+  
   try {
-    return new Intl.NumberFormat(currencyLocaleMap[storedCurrency] || 'en-US', {
+    return new Intl.NumberFormat(getLocaleForCurrency(storedCurrency), {
       style: 'currency',
       currency: storedCurrency,
       minimumFractionDigits: 0,
