@@ -6,9 +6,12 @@ import { useAuth } from "@/context/AuthContext";
 import { Users, Clock, DollarSign, TrendingUp, Calendar, Shield } from "lucide-react";
 import { dataIntegrationService } from "@/services/dataIntegrationService";
 import { format } from "date-fns";
+import { formatCurrencySync } from "@/utils/salaryCalculations";
+import { useCurrency } from "@/hooks/useCurrency";
 
 export default function DashboardPage() {
   const { userProfile } = useAuth();
+  const { currency } = useCurrency();
   const [stats, setStats] = useState({
     totalEmployees: 0,
     averageAttendance: 0,
@@ -59,7 +62,7 @@ export default function DashboardPage() {
     },
     {
       title: "Monthly Salary Expense",
-      value: `$${stats.totalSalaryExpense.toLocaleString()}`,
+      value: formatCurrencySync(stats.totalSalaryExpense),
       icon: DollarSign,
       color: "bg-purple-500",
       change: "+8% from last month"
