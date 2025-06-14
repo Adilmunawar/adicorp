@@ -1,5 +1,5 @@
 
-import { getWorkingDaysInMonth } from "./workingDays";
+import { getDailyRateDivisor } from "./workingDays";
 
 export interface SalaryCalculation {
   totalWorkingDays: number;
@@ -8,12 +8,7 @@ export interface SalaryCalculation {
   calculatedSalary: number;
 }
 
-// Export the working days function for use in other files
-export const getWorkingDaysInMonthForSalary = async (date: Date, companyId: string): Promise<number> => {
-  return await getWorkingDaysInMonth(date, companyId);
-};
-
-// Calculate employee salary based on attendance (simplified)
+// Calculate employee salary based on attendance with fixed divisor
 export const calculateEmployeeSalary = async (
   monthlySalary: number,
   presentDays: number,
@@ -21,15 +16,16 @@ export const calculateEmployeeSalary = async (
   currentMonth: Date,
   companyId: string
 ): Promise<SalaryCalculation> => {
-  const totalWorkingDays = await getWorkingDaysInMonthForSalary(currentMonth, companyId);
-  const dailyRate = monthlySalary / totalWorkingDays;
+  // Always use 26 as divisor for daily rate calculation (as per requirement)
+  const dailyRateDivisor = await getDailyRateDivisor(companyId);
+  const dailyRate = monthlySalary / dailyRateDivisor;
   
   // Calculate actual working days (short leave counts as 0.5 days)
   const actualWorkingDays = presentDays + (shortLeaveDays * 0.5);
   const calculatedSalary = dailyRate * actualWorkingDays;
   
   return {
-    totalWorkingDays,
+    totalWorkingDays: dailyRateDivisor, // For display purposes
     dailyRate,
     actualWorkingDays,
     calculatedSalary

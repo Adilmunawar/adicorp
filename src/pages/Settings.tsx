@@ -2,6 +2,8 @@
 import Dashboard from "@/components/layout/Dashboard";
 import CompanySetupModal from "@/components/company/CompanySetupModal";
 import BackupManager from "@/components/backup/BackupManager";
+import CompanyWorkingSettings from "@/components/settings/CompanyWorkingSettings";
+import MonthlyWorkingDaysManager from "@/components/settings/MonthlyWorkingDaysManager";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
@@ -56,6 +58,12 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Company Working Settings */}
+        {userProfile?.companies && <CompanyWorkingSettings />}
+
+        {/* Monthly Working Days Manager */}
+        {userProfile?.companies && <MonthlyWorkingDaysManager />}
 
         {/* User Information Section */}
         <Card className="glass-card">

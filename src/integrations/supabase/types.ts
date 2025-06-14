@@ -71,6 +71,47 @@ export type Database = {
         }
         Relationships: []
       }
+      company_working_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          default_working_days_per_month: number
+          default_working_days_per_week: number
+          salary_divisor: number
+          updated_at: string
+          weekend_saturday: boolean
+          weekend_sunday: boolean
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          default_working_days_per_month?: number
+          default_working_days_per_week?: number
+          salary_divisor?: number
+          updated_at?: string
+          weekend_saturday?: boolean
+          weekend_sunday?: boolean
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          default_working_days_per_month?: number
+          default_working_days_per_week?: number
+          salary_divisor?: number
+          updated_at?: string
+          weekend_saturday?: boolean
+          weekend_sunday?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_working_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           company_id: string
@@ -114,6 +155,7 @@ export type Database = {
       }
       events: {
         Row: {
+          affects_attendance: boolean
           company_id: string
           created_at: string
           date: string
@@ -123,6 +165,7 @@ export type Database = {
           type: string
         }
         Insert: {
+          affects_attendance?: boolean
           company_id: string
           created_at?: string
           date: string
@@ -132,6 +175,7 @@ export type Database = {
           type: string
         }
         Update: {
+          affects_attendance?: boolean
           company_id?: string
           created_at?: string
           date?: string
@@ -143,6 +187,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_working_days: {
+        Row: {
+          company_id: string
+          configuration: Json
+          created_at: string
+          daily_rate_divisor: number
+          id: string
+          month: string
+          updated_at: string
+          working_days_count: number
+        }
+        Insert: {
+          company_id: string
+          configuration?: Json
+          created_at?: string
+          daily_rate_divisor?: number
+          id?: string
+          month: string
+          updated_at?: string
+          working_days_count?: number
+        }
+        Update: {
+          company_id?: string
+          configuration?: Json
+          created_at?: string
+          daily_rate_divisor?: number
+          id?: string
+          month?: string
+          updated_at?: string
+          working_days_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_working_days_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -259,6 +344,14 @@ export type Database = {
           id: string
           is_admin: boolean
           last_name: string | null
+        }[]
+      }
+      get_working_days_for_month: {
+        Args: { target_company_id: string; target_month: string }
+        Returns: {
+          total_working_days: number
+          daily_rate_divisor: number
+          working_dates: string[]
         }[]
       }
       is_admin: {

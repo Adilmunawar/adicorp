@@ -43,29 +43,39 @@ const dataCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export class ReportDataService {
-  private static getWorkingDaysInMonth(month: Date): number {
-    // Simple calculation - can be enhanced with company-specific working days config
-    const year = month.getFullYear();
-    const monthNum = month.getMonth();
-    const daysInMonth = new Date(year, monthNum + 1, 0).getDate();
-    let workingDays = 0;
-    
-    for (let day = 1; day <= daysInMonth; day++) {
-      const currentDay = new Date(year, monthNum, day);
-      const dayOfWeek = currentDay.getDay();
-      // Exclude weekends (Saturday = 6, Sunday = 0)
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        workingDays++;
+  private static async getWorkingDaysInMonth(companyId: string, month: Date): Promise<{ totalWorkingDays: number; dailyRateDivisor: number }> {
+    try {
+      // Use the new database function to get accurate working days
+      const { data, error } = await supabase.rpc('get_working_days_for_month', {
+        target_company_id: companyId,
+        target_month: format(month, 'yyyy-MM-dd')
+      });
+
+      if (error) {
+        console.error("Error getting working days:", error);
+        // Fallback to default
+        return { totalWorkingDays: 22, dailyRateDivisor: 26 };
       }
+
+      if (data && data.length > 0) {
+        return {
+          totalWorkingDays: data[0].total_working_days,
+          dailyRateDivisor: data[0].daily_rate_divisor
+        };
+      }
+
+      // Default fallback
+      return { totalWorkingDays: 22, dailyRateDivisor: 26 };
+    } catch (error) {
+      console.error("Error in getWorkingDaysInMonth:", error);
+      return { totalWorkingDays: 22, dailyRateDivisor: 26 };
     }
-    
-    return workingDays;
   }
 
   private static calculateEmployeeData(
     employee: any,
     attendance: any[],
-    totalWorkingDays: number
+    dailyRateDivisor: number
   ): ProcessedEmployeeData {
     const employeeAttendance = attendance.filter(att => att.employee_id === employee.id);
     
@@ -88,7 +98,8 @@ export class ReportDataService {
     });
     
     const monthlySalary = Number(employee.wage_rate) || 0;
-    const dailyRate = totalWorkingDays > 0 ? monthlySalary / totalWorkingDays : 0;
+    // Always use the configured divisor (typically 26) for daily rate calculation
+    const dailyRate = monthlySalary / dailyRateDivisor;
     const actualWorkingDays = presentDays + (shortLeaveDays * 0.5);
     const calculatedSalary = dailyRate * actualWorkingDays;
     
@@ -147,6 +158,9 @@ export class ReportDataService {
     const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
     try {
+      // Get working days configuration
+      const { totalWorkingDays, dailyRateDivisor } = await this.getWorkingDaysInMonth(companyId, month);
+
       // Single optimized query for employees
       const { data: employees, error: employeesError } = await supabase
         .from("employees")
@@ -167,7 +181,7 @@ export class ReportDataService {
             totalEmployees: 0,
             averageAttendance: 0,
             averageDailyRate: 0,
-            totalWorkingDaysThisMonth: this.getWorkingDaysInMonth(month),
+            totalWorkingDaysThisMonth: totalWorkingDays,
           },
         };
         dataCache.set(cacheKey, { data: emptyResult, timestamp: Date.now() });
@@ -186,12 +200,10 @@ export class ReportDataService {
       if (attendanceError && attendanceError.code !== "PGRST116") {
         throw new Error(`Failed to fetch attendance: ${attendanceError.message}`);
       }
-
-      const totalWorkingDays = this.getWorkingDaysInMonth(month);
       
-      // Process all data client-side
+      // Process all data client-side with new daily rate calculation
       const employeeData = employees.map(employee => 
-        this.calculateEmployeeData(employee, attendance || [], totalWorkingDays)
+        this.calculateEmployeeData(employee, attendance || [], dailyRateDivisor)
       );
       
       const stats = this.calculateStats(employeeData, totalWorkingDays);

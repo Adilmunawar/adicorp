@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import { WorkingDayConfig } from "@/types/events";
 
-// Get working day configuration for a company (simplified)
+// Get working day configuration for a company
 export const getWorkingDaysConfig = async (companyId: string): Promise<WorkingDayConfig> => {
   try {
     const { data, error } = await supabase
@@ -47,33 +47,84 @@ export const getWorkingDaysConfig = async (companyId: string): Promise<WorkingDa
   }
 };
 
-// Check if a specific date is a working day (simplified)
-export const isWorkingDay = async (date: Date, companyId: string): Promise<boolean> => {
-  const config = await getWorkingDaysConfig(companyId);
-  const dayOfWeek = getDay(date); // 0 = Sunday, 1 = Monday, etc.
-  
-  const dayMapping = {
-    0: 'sunday',
-    1: 'monday',
-    2: 'tuesday',
-    3: 'wednesday',
-    4: 'thursday',
-    5: 'friday',
-    6: 'saturday',
-  };
-  
-  const dayKey = dayMapping[dayOfWeek as keyof typeof dayMapping] as keyof WorkingDayConfig;
-  return config[dayKey] as boolean;
-};
-
-// Simplified working days calculation (default to 22 working days per month)
+// Get working days for a specific month using the new database function
 export const getWorkingDaysInMonth = async (date: Date, companyId: string): Promise<number> => {
   try {
-    // Quick calculation: assume 22 working days per month for performance
-    // This can be made more accurate later if needed
-    return 22;
-  } catch (error) {
-    console.error("Error calculating working days:", error);
+    const { data, error } = await supabase.rpc('get_working_days_for_month', {
+      target_company_id: companyId,
+      target_month: format(startOfMonth(date), 'yyyy-MM-dd')
+    });
+
+    if (error) {
+      console.error("Error getting working days from function:", error);
+      return 22; // Default fallback
+    }
+
+    if (data && data.length > 0) {
+      return data[0].total_working_days;
+    }
+
     return 22; // Default fallback
+  } catch (error) {
+    console.error("Error in getWorkingDaysInMonth:", error);
+    return 22; // Default fallback
+  }
+};
+
+// Get working dates for a specific month
+export const getWorkingDatesInMonth = async (date: Date, companyId: string): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase.rpc('get_working_days_for_month', {
+      target_company_id: companyId,
+      target_month: format(startOfMonth(date), 'yyyy-MM-dd')
+    });
+
+    if (error) {
+      console.error("Error getting working dates from function:", error);
+      return [];
+    }
+
+    if (data && data.length > 0 && data[0].working_dates) {
+      return data[0].working_dates.map((d: Date) => format(d, 'yyyy-MM-dd'));
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Error in getWorkingDatesInMonth:", error);
+    return [];
+  }
+};
+
+// Check if a specific date is a working day
+export const isWorkingDay = async (date: Date, companyId: string): Promise<boolean> => {
+  try {
+    const workingDates = await getWorkingDatesInMonth(date, companyId);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return workingDates.includes(dateStr);
+  } catch (error) {
+    console.error("Error checking if working day:", error);
+    // Fallback to basic logic
+    const dayOfWeek = getDay(date);
+    return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday to Friday
+  }
+};
+
+// Get daily rate divisor (always 26 as per requirement)
+export const getDailyRateDivisor = async (companyId: string): Promise<number> => {
+  try {
+    const { data, error } = await supabase
+      .from('company_working_settings')
+      .select('salary_divisor')
+      .eq('company_id', companyId)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error("Error fetching salary divisor:", error);
+    }
+
+    return data?.salary_divisor || 26; // Default to 26
+  } catch (error) {
+    console.error("Error in getDailyRateDivisor:", error);
+    return 26; // Default to 26
   }
 };
