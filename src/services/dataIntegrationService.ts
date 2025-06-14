@@ -6,23 +6,20 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 export interface EmployeeData {
   id: string;
   name: string;
-  email: string;
-  salary: number;
-  department: string;
-  position: string;
-  joining_date: string;
+  rank: string;
+  wage_rate: number;
+  status: string;
   company_id: string;
+  created_at: string;
+  user_id: string | null;
 }
 
 export interface AttendanceRecord {
   id: string;
   employee_id: string;
   date: string;
-  check_in: string | null;
-  check_out: string | null;
-  total_hours: number;
-  status: 'present' | 'absent' | 'late' | 'half_day';
-  overtime_hours: number;
+  status: 'present' | 'absent' | 'late' | 'short_leave';
+  created_at: string;
 }
 
 export interface SalaryCalculation {
@@ -108,10 +105,18 @@ class DataIntegrationService {
       const startDate = format(startOfMonth(month), 'yyyy-MM-dd');
       const endDate = format(endOfMonth(month), 'yyyy-MM-dd');
 
+      // First get all employees for this company
+      const employees = await this.getEmployees(companyId);
+      const employeeIds = employees.map(emp => emp.id);
+
+      if (employeeIds.length === 0) {
+        return [];
+      }
+
       const { data, error } = await supabase
         .from('attendance')
         .select('*')
-        .eq('company_id', companyId)
+        .in('employee_id', employeeIds)
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date');
@@ -146,12 +151,14 @@ class DataIntegrationService {
       const calculations: SalaryCalculation[] = employees.map(employee => {
         const employeeAttendance = attendance.filter(a => a.employee_id === employee.id);
         const presentDays = employeeAttendance.filter(a => a.status === 'present').length;
-        const absentDays = workingDays - presentDays;
-        const totalOvertimeHours = employeeAttendance.reduce((sum, a) => sum + (a.overtime_hours || 0), 0);
+        const shortLeaveDays = employeeAttendance.filter(a => a.status === 'short_leave').length;
+        const actualWorkingDays = presentDays + (shortLeaveDays * 0.5);
+        const absentDays = workingDays - actualWorkingDays;
 
-        const dailyRate = employee.salary / dailyRateDivisor;
-        const basicSalary = dailyRate * presentDays;
-        const overtimeRate = (employee.salary / (dailyRateDivisor * 8)) * 1.5; // 1.5x overtime rate
+        const dailyRate = employee.wage_rate / dailyRateDivisor;
+        const basicSalary = dailyRate * actualWorkingDays;
+        const overtimeRate = dailyRate / 8 * 1.5; // 1.5x overtime rate per hour
+        const totalOvertimeHours = 0; // No overtime data in current schema
         const overtimePay = totalOvertimeHours * overtimeRate;
         const grossSalary = basicSalary + overtimePay;
         
@@ -199,8 +206,9 @@ class DataIntegrationService {
       ]);
 
       const totalEmployees = employees.length;
-      const totalAttendanceRecords = attendance.length;
-      const averageAttendance = totalEmployees > 0 ? (totalAttendanceRecords / (totalEmployees * workingDays)) * 100 : 0;
+      const presentRecords = attendance.filter(a => a.status === 'present').length;
+      const totalPossibleAttendance = totalEmployees * workingDays;
+      const averageAttendance = totalPossibleAttendance > 0 ? (presentRecords / totalPossibleAttendance) * 100 : 0;
       const totalSalaryExpense = salaries.reduce((sum, s) => sum + s.net_salary, 0);
       const totalOvertimeHours = salaries.reduce((sum, s) => sum + s.overtime_hours, 0);
 
@@ -210,8 +218,8 @@ class DataIntegrationService {
         totalSalaryExpense: Math.round(totalSalaryExpense * 100) / 100,
         totalOvertimeHours: Math.round(totalOvertimeHours * 100) / 100,
         workingDays,
-        presentEmployees: attendance.filter(a => a.status === 'present').length,
-        absentEmployees: attendance.filter(a => a.status === 'absent').length
+        presentEmployees: new Set(attendance.filter(a => a.status === 'present').map(a => a.employee_id)).size,
+        absentEmployees: totalEmployees - new Set(attendance.filter(a => a.status === 'present').map(a => a.employee_id)).size
       };
 
       this.setCache(cacheKey, stats);
