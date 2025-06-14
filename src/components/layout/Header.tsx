@@ -1,8 +1,8 @@
 
 import { useState } from "react";
-import { Bell, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import GlobalSearch from "./GlobalSearch";
 
 export default function Header({ title }: { title: string }) {
   const [notifications] = useState(3);
@@ -12,14 +12,7 @@ export default function Header({ title }: { title: string }) {
       <h1 className="text-2xl font-bold">{title}</h1>
       
       <div className="flex items-center gap-4">
-        <div className="relative max-w-md w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50" size={18} />
-          <Input 
-            type="text" 
-            placeholder="Search..." 
-            className="pl-10 bg-adicorp-dark-light border-white/10 focus:border-adicorp-purple"
-          />
-        </div>
+        <GlobalSearch />
         
         <div className="relative">
           <Button variant="outline" size="icon" className="rounded-full border-white/10">
