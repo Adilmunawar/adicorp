@@ -1,119 +1,111 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import PrivateRoute from "@/components/layout/PrivateRoute";
 import Index from "./pages/Index";
-import DashboardPage from "./pages/Dashboard";
-import EmployeesPage from "./pages/Employees";
-import AttendancePage from "./pages/Attendance";
-import SalaryPage from "./pages/Salary";
-import ReportsPage from "./pages/Reports";
-import SettingsPage from "./pages/Settings";
-import AuthPage from "./pages/Auth";
+import Auth from "./pages/Auth";
+import Dashboard from "./pages/Dashboard";
+import Employees from "./pages/Employees";
+import Attendance from "./pages/Attendance";
+import Salary from "./pages/Salary";
+import Reports from "./pages/Reports";
+import WorkingDays from "./pages/WorkingDays";
+import Events from "./pages/Events";
+import TimelineLogs from "./pages/TimelineLogs";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-import EventsPage from "./pages/Events";
-import WorkingDaysPage from "./pages/WorkingDays";
-import { AuthProvider } from "./context/AuthContext";
-import { PrivateRoute } from "./components/layout/PrivateRoute";
-import CompanySetupModal from "./components/company/CompanySetupModal";
-import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30000,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 function App() {
-  useEffect(() => {
-    console.log("App - Application initialized successfully");
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <CompanySetupModal />
+        <AuthProvider>
+          <Toaster />
+          <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route 
-                path="/dashboard" 
+              <Route path="/auth" element={<Auth />} />
+              <Route
+                path="/dashboard"
                 element={
                   <PrivateRoute>
-                    <DashboardPage />
+                    <Dashboard />
                   </PrivateRoute>
-                } 
+                }
               />
-              <Route 
-                path="/employees" 
+              <Route
+                path="/employees"
                 element={
                   <PrivateRoute>
-                    <EmployeesPage />
+                    <Employees />
                   </PrivateRoute>
-                } 
+                }
               />
-              <Route 
-                path="/attendance" 
+              <Route
+                path="/attendance"
                 element={
                   <PrivateRoute>
-                    <AttendancePage />
+                    <Attendance />
                   </PrivateRoute>
-                } 
+                }
               />
-              <Route 
-                path="/salary" 
+              <Route
+                path="/salary"
                 element={
                   <PrivateRoute>
-                    <SalaryPage />
+                    <Salary />
                   </PrivateRoute>
-                } 
+                }
               />
-              <Route 
-                path="/reports" 
+              <Route
+                path="/reports"
                 element={
                   <PrivateRoute>
-                    <ReportsPage />
+                    <Reports />
                   </PrivateRoute>
-                } 
+                }
               />
-              <Route 
-                path="/events" 
+              <Route
+                path="/working-days"
                 element={
                   <PrivateRoute>
-                    <EventsPage />
+                    <WorkingDays />
                   </PrivateRoute>
-                } 
+                }
               />
-              <Route 
-                path="/working-days" 
+              <Route
+                path="/events"
                 element={
                   <PrivateRoute>
-                    <WorkingDaysPage />
+                    <Events />
                   </PrivateRoute>
-                } 
+                }
               />
-              <Route 
-                path="/settings" 
+              <Route
+                path="/timeline-logs"
                 element={
                   <PrivateRoute>
-                    <SettingsPage />
+                    <TimelineLogs />
                   </PrivateRoute>
-                } 
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <PrivateRoute>
+                    <Settings />
+                  </PrivateRoute>
+                }
               />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </AuthProvider>
-        </BrowserRouter>
+          </BrowserRouter>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { Download, Upload, FileSpreadsheet, Users } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { EmployeeRow } from "@/types/supabase";
@@ -28,6 +28,7 @@ export default function EmployeeImportExport({ onImportComplete, employees }: Em
   const [exporting, setExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { userProfile } = useAuth();
+  const { logActivity } = useActivityLogger();
 
   const downloadTemplate = () => {
     const templateData = [
@@ -123,6 +124,17 @@ export default function EmployeeImportExport({ onImportComplete, employees }: Em
         throw error;
       }
 
+      // Log the activity
+      await logActivity({
+        actionType: 'employee_import',
+        description: `Imported ${insertedData?.length || 0} employees from Excel file`,
+        details: {
+          file_name: file.name,
+          employees_count: insertedData?.length || 0,
+          file_size: `${(file.size / 1024).toFixed(2)} KB`
+        }
+      });
+
       toast.success("Import successful", {
         description: `Successfully imported ${insertedData?.length || 0} employees`
       });
@@ -180,6 +192,17 @@ export default function EmployeeImportExport({ onImportComplete, employees }: Em
       
       const fileName = `employees_export_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
+      
+      // Log the activity
+      await logActivity({
+        actionType: 'employee_export',
+        description: `Exported ${employees.length} employees to Excel file`,
+        details: {
+          file_name: fileName,
+          employees_count: employees.length,
+          export_date: new Date().toISOString()
+        }
+      });
       
       toast.success("Export successful", {
         description: `Exported ${employees.length} employees to ${fileName}`

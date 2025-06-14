@@ -10,7 +10,8 @@ import {
   UserCog,
   LogOut,
   Home,
-  Shield
+  Shield,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +25,7 @@ const navItems = [
   { name: "Reports", icon: ChartPie, path: "/reports" },
   { name: "Working Days", icon: Calendar, path: "/working-days" },
   { name: "Events", icon: Shield, path: "/events" },
+  { name: "Timeline Logs", icon: FileText, path: "/timeline-logs" },
   { name: "Settings", icon: Settings, path: "/settings" },
 ];
 
