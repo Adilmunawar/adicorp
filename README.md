@@ -10,6 +10,9 @@
   <img src="https://github.com/Adilmunawar/adicorp/blob/main/public/supabase-schema-umybjmuzbxfxdtbumgma.svg">
 </p>
 
+## Working Flow>
+<img src="https://github.com/Adilmunawar/adicorp/blob/main/public/diagram%20(4).png">
+
 ## 🌟 Overview
 
 **Adicorp** is a comprehensive Human Resource Management System (HRMS) designed to streamline and automate HR processes for modern businesses. Developed by **Adil Munawar**, this advanced system provides a complete solution for managing employee data, attendance tracking, payroll processing, and generating detailed reports.
