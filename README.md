@@ -123,7 +123,7 @@ For enterprise support and custom development, please contact us directly.
 - 🐦 **Twitter**: [@adilmunawarx](https://twitter.com/adilmunawarx)
 
 ### **Project Links**
-- 🌐 **Live Demo**: [https://adicorp-demo.herokuapp.com](https://adicorp.vercel.com)
+- 🌐 **Live Demo**: (https://adicorp.vercel.com)
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/Adilmunawar/adicorp/issues)
 
 ---
