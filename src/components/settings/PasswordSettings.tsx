@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 
 export default function PasswordSettings() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -18,38 +19,60 @@ export default function PasswordSettings() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
   const { toast } = useToast();
+  const { logActivity } = useActivityLogger();
+
+  const validatePassword = () => {
+    const validationErrors: string[] = [];
+    
+    if (newPassword.length < 6) {
+      validationErrors.push("Password must be at least 6 characters long");
+    }
+    
+    if (newPassword !== confirmPassword) {
+      validationErrors.push("New password and confirmation password don't match");
+    }
+    
+    if (!newPassword) {
+      validationErrors.push("New password is required");
+    }
+    
+    if (!confirmPassword) {
+      validationErrors.push("Password confirmation is required");
+    }
+    
+    setErrors(validationErrors);
+    return validationErrors.length === 0;
+  };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Password Mismatch",
-        description: "New password and confirmation password don't match.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      toast({
-        title: "Password Too Short",
-        description: "Password must be at least 6 characters long.",
-        variant: "destructive",
-      });
+    if (!validatePassword()) {
       return;
     }
 
     try {
       setIsLoading(true);
       setSuccess(false);
+      setErrors([]);
 
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (error) throw error;
+
+      // Log the password change activity
+      await logActivity({
+        actionType: 'password_change',
+        description: 'User changed their password',
+        details: {
+          timestamp: new Date().toISOString(),
+          priority: 'high'
+        }
+      });
 
       setSuccess(true);
       setCurrentPassword("");
@@ -61,11 +84,19 @@ export default function PasswordSettings() {
         description: "Your password has been successfully updated.",
       });
 
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => {
+        setSuccess(false);
+      }, 5000);
+
     } catch (error: any) {
       console.error("Password change error:", error);
+      const errorMessage = error.message || "Failed to update password. Please try again.";
+      setErrors([errorMessage]);
+      
       toast({
         title: "Password Update Failed",
-        description: error.message || "Failed to update password. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -93,6 +124,19 @@ export default function PasswordSettings() {
           </Alert>
         )}
         
+        {errors.length > 0 && (
+          <Alert className="mb-4 border-red-500/20 bg-red-500/10">
+            <AlertCircle className="h-4 w-4 text-red-400" />
+            <AlertDescription className="text-red-400">
+              <ul className="list-disc list-inside space-y-1">
+                {errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <form onSubmit={handlePasswordChange} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="newPassword" className="text-white/90">New Password</Label>
@@ -102,7 +146,10 @@ export default function PasswordSettings() {
                 type={showNewPassword ? "text" : "password"}
                 placeholder="Enter new password"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  setErrors([]);
+                }}
                 className="bg-adicorp-dark/60 border-white/10 focus:border-adicorp-purple transition-colors pr-10"
                 required
               />
@@ -130,7 +177,10 @@ export default function PasswordSettings() {
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder="Confirm new password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setErrors([]);
+                }}
                 className="bg-adicorp-dark/60 border-white/10 focus:border-adicorp-purple transition-colors pr-10"
                 required
               />
@@ -165,6 +215,15 @@ export default function PasswordSettings() {
             )}
           </Button>
         </form>
+
+        <div className="mt-6 p-4 bg-adicorp-dark/30 rounded-lg border border-white/10">
+          <h4 className="font-semibold text-sm mb-2 text-white">Password Requirements:</h4>
+          <ul className="text-sm text-white/70 space-y-1">
+            <li>• Minimum 6 characters long</li>
+            <li>• New password and confirmation must match</li>
+            <li>• Use a strong, unique password</li>
+          </ul>
+        </div>
       </CardContent>
     </Card>
   );

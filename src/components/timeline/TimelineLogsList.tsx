@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,13 @@ import {
   Edit,
   RefreshCw,
   Search,
-  Filter
+  Filter,
+  AlertCircle,
+  Info,
+  CheckCircle
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 interface ActivityLog {
   id: string;
@@ -33,7 +38,10 @@ interface ActivityLog {
   user_id: string;
   company_id: string;
   created_at: string;
-  user_email?: string;
+  profiles?: {
+    first_name: string | null;
+    last_name: string | null;
+  } | null;
 }
 
 const actionIcons = {
@@ -48,8 +56,10 @@ const actionIcons = {
   'event_update': Shield,
   'event_delete': Shield,
   'attendance_bulk_update': RefreshCw,
+  'attendance_save': CheckCircle,
   'company_setup': Settings,
   'system_backup': Download,
+  'password_change': AlertCircle,
   'default': Clock
 };
 
@@ -65,9 +75,62 @@ const actionColors = {
   'event_update': 'bg-indigo-500',
   'event_delete': 'bg-pink-500',
   'attendance_bulk_update': 'bg-teal-500',
+  'attendance_save': 'bg-green-600',
   'company_setup': 'bg-violet-500',
   'system_backup': 'bg-gray-500',
+  'password_change': 'bg-red-600',
   'default': 'bg-slate-500'
+};
+
+const getPriority = (actionType: string, details: any) => {
+  if (details?.priority) {
+    return details.priority;
+  }
+  
+  switch (actionType) {
+    case 'password_change':
+    case 'employee_delete':
+    case 'system_backup':
+      return 'high';
+    case 'employee_create':
+    case 'employee_update':
+    case 'settings_update':
+    case 'working_days_update':
+      return 'medium';
+    case 'attendance_save':
+    case 'attendance_bulk_update':
+    case 'event_create':
+    case 'event_update':
+      return 'low';
+    default:
+      return 'medium';
+  }
+};
+
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case 'high':
+      return 'bg-red-500/20 text-red-400 border-red-500/30';
+    case 'medium':
+      return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+    case 'low':
+      return 'bg-green-500/20 text-green-400 border-green-500/30';
+    default:
+      return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+  }
+};
+
+const getPriorityIcon = (priority: string) => {
+  switch (priority) {
+    case 'high':
+      return AlertCircle;
+    case 'medium':
+      return Info;
+    case 'low':
+      return CheckCircle;
+    default:
+      return Info;
+  }
 };
 
 export default function TimelineLogsList() {
@@ -75,9 +138,11 @@ export default function TimelineLogsList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [page, setPage] = useState(1);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useQueryClient();
   const ITEMS_PER_PAGE = 20;
 
-  const { data: logs, isLoading, error } = useQuery({
+  const { data: logs, isLoading, error, refetch } = useQuery({
     queryKey: ['timeline-logs', userProfile?.company_id, searchTerm, filterType, page],
     queryFn: async () => {
       if (!userProfile?.company_id) return [];
@@ -117,13 +182,28 @@ export default function TimelineLogsList() {
 
       return data?.map(log => ({
         ...log,
-        user_email: log.profiles ? 
+        user_name: log.profiles ? 
           `${log.profiles.first_name || ''} ${log.profiles.last_name || ''}`.trim() || 'Unknown User'
           : 'System'
       })) || [];
     },
     enabled: !!userProfile?.company_id,
   });
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Invalidate and refetch the timeline logs
+      await queryClient.invalidateQueries({ queryKey: ['timeline-logs'] });
+      await refetch();
+      toast.success("Timeline logs refreshed successfully!");
+    } catch (error) {
+      console.error("Error refreshing timeline logs:", error);
+      toast.error("Failed to refresh timeline logs");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const getActionIcon = (actionType: string) => {
     const IconComponent = actionIcons[actionType as keyof typeof actionIcons] || actionIcons.default;
@@ -166,6 +246,12 @@ export default function TimelineLogsList() {
       <Card className="glass-card">
         <CardContent className="p-6 text-center">
           <p className="text-red-400">Error loading timeline logs</p>
+          <Button 
+            onClick={handleRefresh} 
+            className="mt-4 bg-adicorp-purple hover:bg-adicorp-purple-dark"
+          >
+            Try Again
+          </Button>
         </CardContent>
       </Card>
     );
@@ -173,6 +259,24 @@ export default function TimelineLogsList() {
 
   return (
     <div className="space-y-6">
+      {/* Header with Refresh Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-2">System Activity Timeline</h2>
+          <p className="text-white/70">
+            Track all important changes and activities in your system with detailed timestamps
+          </p>
+        </div>
+        <Button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+        </Button>
+      </div>
+
       {/* Filters */}
       <Card className="glass-card">
         <CardContent className="p-4">
@@ -196,11 +300,13 @@ export default function TimelineLogsList() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Activities</SelectItem>
+                  <SelectItem value="password_change">Password Changes</SelectItem>
                   <SelectItem value="employee_import">Employee Import</SelectItem>
                   <SelectItem value="employee_export">Employee Export</SelectItem>
                   <SelectItem value="employee_create">Employee Created</SelectItem>
                   <SelectItem value="employee_update">Employee Updated</SelectItem>
                   <SelectItem value="employee_delete">Employee Deleted</SelectItem>
+                  <SelectItem value="attendance_save">Attendance Saved</SelectItem>
                   <SelectItem value="settings_update">Settings Changed</SelectItem>
                   <SelectItem value="working_days_update">Working Days Updated</SelectItem>
                   <SelectItem value="event_create">Event Created</SelectItem>
@@ -219,6 +325,9 @@ export default function TimelineLogsList() {
           logs.map((log) => {
             const IconComponent = getActionIcon(log.action_type);
             const actionColor = getActionColor(log.action_type);
+            const priority = getPriority(log.action_type, log.details);
+            const priorityColor = getPriorityColor(priority);
+            const PriorityIcon = getPriorityIcon(priority);
             
             return (
               <Card key={log.id} className="glass-card hover:bg-white/5 transition-colors">
@@ -235,8 +344,12 @@ export default function TimelineLogsList() {
                             <Badge variant="outline" className="text-xs border-white/20 text-white/80">
                               {formatActionType(log.action_type)}
                             </Badge>
+                            <Badge className={`text-xs ${priorityColor}`}>
+                              <PriorityIcon className="h-3 w-3 mr-1" />
+                              {priority.toUpperCase()}
+                            </Badge>
                             <span className="text-sm text-white/60">
-                              by {log.user_email}
+                              by {log.user_name}
                             </span>
                           </div>
                           <p className="text-white font-medium mb-2">{log.description}</p>

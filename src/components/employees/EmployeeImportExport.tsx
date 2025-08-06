@@ -28,7 +28,7 @@ export default function EmployeeImportExport({ onImportComplete, employees }: Em
   const [exporting, setExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { userProfile } = useAuth();
-  const { logActivity } = useActivityLogger();
+  const { logActivity, logEmployeeActivity } = useActivityLogger();
 
   const downloadTemplate = () => {
     const templateData = [
@@ -124,15 +124,17 @@ export default function EmployeeImportExport({ onImportComplete, employees }: Em
         throw error;
       }
 
-      // Log the activity
+      // Enhanced activity logging
       await logActivity({
         actionType: 'employee_import',
         description: `Imported ${insertedData?.length || 0} employees from Excel file`,
         details: {
           file_name: file.name,
           employees_count: insertedData?.length || 0,
-          file_size: `${(file.size / 1024).toFixed(2)} KB`
-        }
+          file_size: `${(file.size / 1024).toFixed(2)} KB`,
+          employee_names: employeesToInsert.map(emp => emp.name).join(', ')
+        },
+        priority: 'medium'
       });
 
       toast.success("Import successful", {
@@ -193,15 +195,17 @@ export default function EmployeeImportExport({ onImportComplete, employees }: Em
       const fileName = `employees_export_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
       
-      // Log the activity
+      // Enhanced activity logging
       await logActivity({
         actionType: 'employee_export',
         description: `Exported ${employees.length} employees to Excel file`,
         details: {
           file_name: fileName,
           employees_count: employees.length,
-          export_date: new Date().toISOString()
-        }
+          export_date: new Date().toISOString(),
+          employee_names: employees.map(emp => emp.name).join(', ')
+        },
+        priority: 'low'
       });
       
       toast.success("Export successful", {
