@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -37,21 +36,7 @@ import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
-
-interface Employee {
-  id: string;
-  created_at: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  rank: string;
-  wage_rate: number;
-  company_id: string;
-  user_id?: string;
-  status: string;
-  avatar_url?: string | null;
-}
+import { EmployeeRow } from "@/types/supabase";
 
 interface EmployeeListProps {
   onAddEmployee?: () => void;
@@ -93,7 +78,7 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
     enabled: !!userProfile?.company_id,
   });
 
-  const handleDeleteEmployee = async (employee: Employee) => {
+  const handleDeleteEmployee = async (employee: EmployeeRow) => {
     if (!confirm(`Are you sure you want to delete ${employee.name}?`)) {
       return;
     }
