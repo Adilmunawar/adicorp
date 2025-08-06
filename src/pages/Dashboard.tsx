@@ -1,7 +1,9 @@
+
 import Dashboard from "@/components/layout/Dashboard";
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import { Clock } from "lucide-react";
+import DashboardStats from "@/components/dashboard/DashboardStats";
 
 export default function DashboardPage() {
   const { userProfile } = useAuth();
@@ -38,6 +40,9 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Dashboard Stats */}
+        <DashboardStats />
       </div>
     </Dashboard>
   );

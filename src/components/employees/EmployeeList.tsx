@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -37,6 +38,7 @@ import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { EmployeeRow } from "@/types/supabase";
+import EmployeeImportExport from "./EmployeeImportExport";
 
 interface EmployeeListProps {
   onAddEmployee?: () => void;
@@ -51,7 +53,7 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
   const ITEMS_PER_PAGE = 10;
   const { logEmployeeActivity } = useActivityLogger();
 
-  const { data: employees, isLoading, error } = useQuery({
+  const { data: employees, isLoading, error, refetch } = useQuery({
     queryKey: ['employees', userProfile?.company_id, searchTerm, page],
     queryFn: async () => {
       if (!userProfile?.company_id) return [];
@@ -91,7 +93,6 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
 
       if (error) throw error;
 
-      // Log the employee deletion activity
       await logEmployeeActivity('delete', employee.name, {
         employee_id: employee.id,
         rank: employee.rank,
@@ -105,6 +106,10 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
       console.error("Error deleting employee:", error);
       toast.error("Failed to delete employee");
     }
+  };
+
+  const handleImportComplete = () => {
+    refetch();
   };
 
   if (isLoading) {
@@ -140,6 +145,12 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
 
   return (
     <div className="space-y-6">
+      {/* Import/Export Section */}
+      <EmployeeImportExport 
+        onImportComplete={handleImportComplete}
+        employees={employees || []}
+      />
+
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -188,11 +199,7 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
                   <TableRow key={employee.id}>
                     <TableCell>
                       <Avatar>
-                        {employee.avatar_url ? (
-                          <AvatarImage src={employee.avatar_url} alt={employee.name} />
-                        ) : (
-                          <AvatarFallback>{employee.name.charAt(0).toUpperCase()}</AvatarFallback>
-                        )}
+                        <AvatarFallback>{employee.name.charAt(0).toUpperCase()}</AvatarFallback>
                       </Avatar>
                     </TableCell>
                     <TableCell className="font-medium">{employee.name}</TableCell>
@@ -223,15 +230,6 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
                             <Trash2 className="mr-2 h-4 w-4" />
                             <span>Delete</span>
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {employee.email && (
-                            <DropdownMenuItem>
-                              <a href={`mailto:${employee.email}`} className="flex items-center gap-2">
-                                <Mail className="mr-2 h-4 w-4" />
-                                <span>Contact Employee</span>
-                              </a>
-                            </DropdownMenuItem>
-                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
