@@ -9,9 +9,12 @@ import { useSalaryDownloads } from "@/hooks/useSalaryDownloads";
 import SalaryStats from "@/components/salary/SalaryStats";
 import SalarySheet from "@/components/salary/SalarySheet";
 import PayslipsGrid from "@/components/salary/PayslipsGrid";
+import MonthSelector from "@/components/common/MonthSelector";
+import { startOfMonth } from "date-fns";
 
 export default function SalaryPage() {
   const [activeTab, setActiveTab] = useState("salary-sheet");
+  const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()));
   
   const {
     employeeSalaryData,
@@ -21,7 +24,7 @@ export default function SalaryPage() {
     totalWorkingDaysThisMonth,
     currentMonthName,
     handleRetry
-  } = useSalaryData();
+  } = useSalaryData(selectedMonth);
 
   const {
     downloading,
@@ -49,6 +52,16 @@ export default function SalaryPage() {
   
   return (
     <Dashboard title="Salary Management">
+      <div className="flex justify-between items-center mb-6">
+        <MonthSelector 
+          selectedMonth={selectedMonth}
+          onMonthChange={setSelectedMonth}
+        />
+        <div className="text-sm text-white/60">
+          Viewing data for {currentMonthName}
+        </div>
+      </div>
+
       <SalaryStats stats={stats} loading={loading} />
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

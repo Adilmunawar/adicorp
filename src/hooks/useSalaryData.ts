@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 import { ReportDataService } from "@/services/reportDataService";
 
 interface EmployeeSalaryData {
@@ -25,7 +25,7 @@ interface SalaryStats {
   employeeCount: number;
 }
 
-export function useSalaryData() {
+export function useSalaryData(selectedMonth?: Date) {
   const [employeeSalaryData, setEmployeeSalaryData] = useState<EmployeeSalaryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<SalaryStats>({
@@ -39,7 +39,7 @@ export function useSalaryData() {
   const { toast } = useToast();
   const { userProfile } = useAuth();
   
-  const currentMonth = useMemo(() => new Date(), []);
+  const currentMonth = useMemo(() => selectedMonth || startOfMonth(new Date()), [selectedMonth]);
   const currentMonthName = useMemo(() => format(currentMonth, "MMMM yyyy"), [currentMonth]);
 
   const fetchAllData = useCallback(async () => {
@@ -109,6 +109,7 @@ export function useSalaryData() {
     totalWorkingDaysThisMonth,
     currentMonthName,
     fetchAllData,
-    handleRetry
+    handleRetry,
+    selectedMonth: currentMonth
   };
 }

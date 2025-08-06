@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -114,10 +115,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (event === 'SIGNED_OUT') {
               setUserProfile(null);
-              setLoading(false); // immediately stop loading if signed out
+              setLoading(false);
+              // Clear any cached data
+              localStorage.removeItem('app_currency');
+              // Force redirect to auth page
+              if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+                window.location.href = '/auth';
+              }
             }
             if (event === 'SIGNED_IN') {
-              // setLoading(false); -- do this in fetchProfile effect below
+              // Loading will be handled by the profile fetch effect
             }
           }
         );
@@ -189,10 +196,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
       setLoading(true);
+      const redirectUrl = `${window.location.origin}/auth`;
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: metadata }
+        options: { 
+          data: metadata,
+          emailRedirectTo: redirectUrl
+        }
       });
       if (error) throw error;
       
@@ -217,9 +229,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       console.log("AuthContext - Attempting sign out");
+      
+      // Clear user state immediately
+      setSession(null);
+      setUser(null);
+      setUserProfile(null);
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
       console.log("AuthContext - Sign out successful");
+      
+      // Force navigation to auth page
+      window.location.href = '/auth';
+      
     } catch (error: any) {
       console.error("AuthContext - Sign out failed:", error);
       toast({
@@ -227,6 +250,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: error.message,
         variant: "destructive",
       });
+      
+      // Even if signout fails, clear local state and redirect
+      setSession(null);
+      setUser(null);
+      setUserProfile(null);
+      window.location.href = '/auth';
     } finally {
       setLoading(false);
     }
