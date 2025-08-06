@@ -20,6 +20,12 @@ const EmployeesPage = () => {
   
   const handleCloseForm = () => {
     setShowEmployeeForm(false);
+    setEditEmployeeId(undefined);
+  };
+
+  const handleSuccess = () => {
+    setShowEmployeeForm(false);
+    setEditEmployeeId(undefined);
   };
   
   return (
@@ -29,11 +35,14 @@ const EmployeesPage = () => {
         onEditEmployee={handleEditEmployee}
       />
       
-      <EmployeeForm 
-        isOpen={showEmployeeForm}
-        onClose={handleCloseForm}
-        employeeId={editEmployeeId}
-      />
+      {showEmployeeForm && (
+        <EmployeeForm 
+          isOpen={showEmployeeForm}
+          onClose={handleCloseForm}
+          onSuccess={handleSuccess}
+          employeeId={editEmployeeId}
+        />
+      )}
     </Dashboard>
   );
 };

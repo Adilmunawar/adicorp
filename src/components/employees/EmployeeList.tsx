@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Edit, Trash2, User, Search, MoreHorizontal } from "lucide-react";
+import { Edit, Trash2, User, Search, MoreHorizontal, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -31,7 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,20 +42,26 @@ interface Employee {
   id: string;
   created_at: string;
   name: string;
-  email: string;
-  phone: string;
-  address: string;
+  email?: string;
+  phone?: string;
+  address?: string;
   rank: string;
   wage_rate: number;
   company_id: string;
-  avatar_url: string | null;
+  user_id?: string;
+  status: string;
+  avatar_url?: string | null;
 }
 
-export default function EmployeeList() {
+interface EmployeeListProps {
+  onAddEmployee?: () => void;
+  onEditEmployee?: (id: string) => void;
+}
+
+export default function EmployeeList({ onAddEmployee, onEditEmployee }: EmployeeListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
   const { userProfile } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const ITEMS_PER_PAGE = 10;
   const { logEmployeeActivity } = useActivityLogger();
@@ -150,9 +157,19 @@ export default function EmployeeList() {
     <div className="space-y-6">
       <Card className="glass-card">
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <User className="mr-2 h-5 w-5 text-adicorp-purple" />
-            Employee List
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <User className="mr-2 h-5 w-5 text-adicorp-purple" />
+              Employee List
+            </div>
+            {onAddEmployee && (
+              <Button 
+                onClick={onAddEmployee}
+                className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
+              >
+                Add Employee
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -175,9 +192,9 @@ export default function EmployeeList() {
                 <TableRow>
                   <TableHead className="w-[50px]">Avatar</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Rank</TableHead>
                   <TableHead>Wage Rate</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -194,11 +211,15 @@ export default function EmployeeList() {
                       </Avatar>
                     </TableCell>
                     <TableCell className="font-medium">{employee.name}</TableCell>
-                    <TableCell>{employee.email}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{employee.rank}</Badge>
                     </TableCell>
                     <TableCell>${employee.wage_rate}</TableCell>
+                    <TableCell>
+                      <Badge variant={employee.status === 'active' ? 'default' : 'destructive'}>
+                        {employee.status}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -209,7 +230,7 @@ export default function EmployeeList() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => alert('Edit feature coming soon!')}>
+                          <DropdownMenuItem onClick={() => onEditEmployee?.(employee.id)}>
                             <Edit className="mr-2 h-4 w-4" />
                             <span>Edit</span>
                           </DropdownMenuItem>
@@ -218,12 +239,14 @@ export default function EmployeeList() {
                             <span>Delete</span>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem>
-                            <a href={`mailto:${employee.email}`} className="flex items-center gap-2">
-                              <Mail className="mr-2 h-4 w-4" />
-                              <span>Contact Employee</span>
-                            </a>
-                          </DropdownMenuItem>
+                          {employee.email && (
+                            <DropdownMenuItem>
+                              <a href={`mailto:${employee.email}`} className="flex items-center gap-2">
+                                <Mail className="mr-2 h-4 w-4" />
+                                <span>Contact Employee</span>
+                              </a>
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
