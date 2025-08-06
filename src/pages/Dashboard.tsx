@@ -1,256 +1,169 @@
 
-import { useEffect, useState } from "react";
-import Dashboard from "@/components/layout/Dashboard";
+import DashboardLayout from "@/components/layout/Dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { Users, Clock, DollarSign, TrendingUp, Calendar, Shield } from "lucide-react";
-import { dataIntegrationService } from "@/services/dataIntegrationService";
-import { format } from "date-fns";
-import { formatCurrencySync } from "@/utils/salaryCalculations";
-import { useCurrency } from "@/hooks/useCurrency";
-import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
-import { ErrorBoundary } from "@/components/common/ErrorBoundary";
-import { ResponsiveContainer } from "@/components/layout/ResponsiveContainer";
+import { Users, Calendar, DollarSign, TrendingUp, Building, Shield } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import SalaryStats from "@/components/salary/SalaryStats";
 
-export default function DashboardPage() {
+export default function Dashboard() {
   const { userProfile } = useAuth();
-  const { currency } = useCurrency();
-  const [stats, setStats] = useState({
-    totalEmployees: 0,
-    averageAttendance: 0,
-    totalSalaryExpense: 0,
-    totalOvertimeHours: 0,
-    workingDays: 0,
-    presentEmployees: 0,
-    absentEmployees: 0
+
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['dashboard-stats', userProfile?.company_id],
+    queryFn: async () => {
+      if (!userProfile?.company_id) return null;
+
+      const [employeesResult, attendanceResult, eventsResult] = await Promise.all([
+        supabase
+          .from('employees')
+          .select('*', { count: 'exact' })
+          .eq('company_id', userProfile.company_id)
+          .eq('status', 'active'),
+        
+        supabase
+          .from('attendance')
+          .select('status', { count: 'exact' })
+          .gte('date', new Date().toISOString().split('T')[0])
+          .lte('date', new Date().toISOString().split('T')[0]),
+        
+        supabase
+          .from('events')
+          .select('*', { count: 'exact' })
+          .eq('company_id', userProfile.company_id)
+          .gte('date', new Date().toISOString().split('T')[0])
+      ]);
+
+      return {
+        totalEmployees: employeesResult.count || 0,
+        todayAttendance: attendanceResult.count || 0,
+        upcomingEvents: eventsResult.count || 0,
+        employees: employeesResult.data || []
+      };
+    },
+    enabled: !!userProfile?.company_id
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (!userProfile?.companies?.id) return;
-
-      setLoading(true);
-      setError(null);
-      try {
-        const currentMonth = new Date();
-        const companyStats = await dataIntegrationService.getCompanyStats(
-          userProfile.companies.id, 
-          currentMonth
-        );
-        setStats(companyStats);
-      } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
-        setError('Failed to load dashboard data. Please refresh the page.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, [userProfile?.companies?.id]);
-
-  const statCards = [
-    {
-      title: "Total Employees",
-      value: stats.totalEmployees,
-      icon: Users,
-      color: "bg-blue-500",
-      change: "+2 this month",
-      trend: "up"
-    },
-    {
-      title: "Average Attendance",
-      value: `${stats.averageAttendance}%`,
-      icon: Clock,
-      color: "bg-green-500",
-      change: "+5% from last month",
-      trend: "up"
-    },
-    {
-      title: "Monthly Salary Expense",
-      value: formatCurrencySync(stats.totalSalaryExpense),
-      icon: DollarSign,
-      color: "bg-purple-500",
-      change: "+8% from last month",
-      trend: "up"
-    },
-    {
-      title: "Overtime Hours",
-      value: stats.totalOvertimeHours,
-      icon: TrendingUp,
-      color: "bg-orange-500",
-      change: "-3% from last month",
-      trend: "down"
-    }
-  ];
-
-  if (loading) {
-    return (
-      <Dashboard title="Dashboard">
-        <ResponsiveContainer>
-          <LoadingSkeleton type="dashboard" />
-        </ResponsiveContainer>
-      </Dashboard>
-    );
-  }
-
-  if (error) {
-    return (
-      <Dashboard title="Dashboard">
-        <ResponsiveContainer>
-          <div className="text-center py-8">
-            <p className="text-red-400 mb-4">{error}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-adicorp-purple rounded-lg hover:bg-adicorp-purple-dark transition-colors"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </ResponsiveContainer>
-      </Dashboard>
-    );
-  }
+  const StatCard = ({ title, value, icon, description, loading }: {
+    title: string;
+    value: string | number;
+    icon: React.ReactNode;
+    description?: string;
+    loading?: boolean;
+  }) => (
+    <Card className="glass-card">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-white/80">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-8 w-20 bg-white/10" />
+        ) : (
+          <div className="text-2xl font-bold text-white mb-1">{value}</div>
+        )}
+        {description && (
+          <p className="text-xs text-white/60">{description}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
-    <Dashboard title="Dashboard">
-      <ErrorBoundary>
-        <ResponsiveContainer>
-          <div className="space-y-6">
-            {/* Welcome Section */}
-            <div className="glass-card p-4 md:p-6 animate-fade-in">
-              <h2 className="text-xl md:text-2xl font-bold mb-2">
-                Welcome back, {userProfile?.first_name || "Admin"}! 👋
-              </h2>
-              <p className="text-white/70 text-sm md:text-base">
-                Here's what's happening with your company today - {format(new Date(), 'MMMM dd, yyyy')}
+    <DashboardLayout title="Dashboard">
+      <div className="space-y-8">
+        {/* Welcome Section with Logo */}
+        <div className="glass-card p-8 text-center">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <img 
+              src="/AdilMunawar-uploads/31e3e556-6bb0-44a2-bd2d-6d5fa04f0ba9.png" 
+              alt="AdiCorp Logo" 
+              className="w-16 h-16 rounded-full border-2 border-adicorp-purple/30"
+            />
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-adicorp-purple bg-clip-text text-transparent">
+                Welcome to AdiCorp
+              </h1>
+              <p className="text-white/70 mt-2">
+                {userProfile?.companies?.name ? `Managing ${userProfile.companies.name}` : 'Employee Management System'}
               </p>
             </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-              {statCards.map((stat, index) => (
-                <Card 
-                  key={index} 
-                  className="glass-card hover:shadow-lg transition-all duration-200 hover:scale-105"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs md:text-sm font-medium text-white/80 line-clamp-2">
-                      {stat.title}
-                    </CardTitle>
-                    <div className={`p-2 rounded-lg ${stat.color} flex-shrink-0`}>
-                      <stat.icon className="h-3 w-3 md:h-4 md:w-4 text-white" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl md:text-2xl font-bold text-white mb-1">
-                      {stat.value}
-                    </div>
-                    <p className={`text-xs text-white/60 flex items-center gap-1 ${
-                      stat.trend === 'up' ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      <span className={stat.trend === 'up' ? '↗' : '↘'} />
-                      {stat.change}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Quick Actions Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-              {/* Today's Overview */}
-              <Card className="glass-card hover:shadow-lg transition-all duration-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-sm md:text-base">
-                    <Calendar className="h-4 w-4 md:h-5 md:w-5 mr-2 text-adicorp-purple" />
-                    Today's Overview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 md:space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/70 text-sm">Present Today:</span>
-                    <span className="font-semibold text-green-400 text-sm md:text-base">
-                      {stats.presentEmployees}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/70 text-sm">Absent Today:</span>
-                    <span className="font-semibold text-red-400 text-sm md:text-base">
-                      {stats.absentEmployees}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/70 text-sm">Working Days This Month:</span>
-                    <span className="font-semibold text-blue-400 text-sm md:text-base">
-                      {stats.workingDays}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Quick Actions */}
-              <Card className="glass-card hover:shadow-lg transition-all duration-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-sm md:text-base">
-                    <Shield className="h-4 w-4 md:h-5 md:w-5 mr-2 text-adicorp-purple" />
-                    Quick Actions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {[
-                    { href: '/employees', title: 'Manage Employees', desc: 'Add, edit or view employee details' },
-                    { href: '/attendance', title: 'Mark Attendance', desc: 'Record today\'s attendance' },
-                    { href: '/working-days', title: 'Working Days Setup', desc: 'Configure policies and schedules' }
-                  ].map((action, index) => (
-                    <button 
-                      key={index}
-                      onClick={() => window.location.href = action.href}
-                      className="w-full text-left p-3 rounded-lg bg-adicorp-dark/30 hover:bg-adicorp-dark/50 transition-all duration-200 hover:scale-102 focus:outline-none focus:ring-2 focus:ring-adicorp-purple/50"
-                      aria-label={action.title}
-                    >
-                      <div className="font-medium text-sm md:text-base">{action.title}</div>
-                      <div className="text-xs md:text-sm text-white/60">{action.desc}</div>
-                    </button>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Recent Activity */}
-              <Card className="glass-card hover:shadow-lg transition-all duration-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-sm md:text-base">
-                    <TrendingUp className="h-4 w-4 md:h-5 md:w-5 mr-2 text-adicorp-purple" />
-                    Recent Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-sm">
-                    <div className="font-medium mb-2">Latest Updates</div>
-                    <div className="space-y-1 text-white/60">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-400 rounded-full" />
-                        <span className="text-xs md:text-sm">Salary calculations updated</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full" />
-                        <span className="text-xs md:text-sm">Working time policies configured</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-purple-400 rounded-full" />
-                        <span className="text-xs md:text-sm">Attendance records synchronized</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </div>
-        </ResponsiveContainer>
-      </ErrorBoundary>
-    </Dashboard>
+          <div className="flex items-center justify-center gap-2 text-adicorp-purple">
+            <Shield className="h-5 w-5" />
+            <span className="text-sm">Secure • Reliable • Advanced</span>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            title="Total Employees"
+            value={stats?.totalEmployees || 0}
+            icon={<Users className="h-4 w-4 text-blue-400" />}
+            description="Active employees"
+            loading={statsLoading}
+          />
+          <StatCard
+            title="Today's Attendance"
+            value={stats?.todayAttendance || 0}
+            icon={<Calendar className="h-4 w-4 text-green-400" />}
+            description="Present today"
+            loading={statsLoading}
+          />
+          <StatCard
+            title="Upcoming Events"
+            value={stats?.upcomingEvents || 0}
+            icon={<TrendingUp className="h-4 w-4 text-purple-400" />}
+            description="This month"
+            loading={statsLoading}
+          />
+          <StatCard
+            title="Company Status"
+            value={userProfile?.companies?.name ? "Active" : "Setup Required"}
+            icon={<Building className="h-4 w-4 text-yellow-400" />}
+            description={userProfile?.companies?.name || "Complete setup"}
+            loading={!userProfile}
+          />
+        </div>
+
+        {/* Salary Statistics */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-white">Monthly Overview</h2>
+          <SalaryStats />
+        </div>
+
+        {/* Recent Activity Summary */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-adicorp-purple" />
+              System Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mb-2"></div>
+                <p className="text-sm text-green-400">System Online</p>
+                <p className="text-xs text-white/60">All services operational</p>
+              </div>
+              <div className="text-center p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                <div className="w-3 h-3 bg-blue-500 rounded-full mx-auto mb-2"></div>
+                <p className="text-sm text-blue-400">Data Synced</p>
+                <p className="text-xs text-white/60">Real-time updates active</p>
+              </div>
+              <div className="text-center p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                <div className="w-3 h-3 bg-purple-500 rounded-full mx-auto mb-2"></div>
+                <p className="text-sm text-purple-400">Secure</p>
+                <p className="text-xs text-white/60">Protected by encryption</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardLayout>
   );
 }

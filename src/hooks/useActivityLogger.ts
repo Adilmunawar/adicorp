@@ -30,7 +30,8 @@ export const useActivityLogger = () => {
         priority,
         timestamp: new Date().toISOString(),
         user_agent: navigator.userAgent,
-        ip_address: 'client-side' // Could be enhanced with actual IP detection
+        ip_address: 'client-side',
+        user_name: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 'Unknown User'
       };
 
       const { error } = await supabase
@@ -56,19 +57,34 @@ export const useActivityLogger = () => {
   // Enhanced logging functions for specific activities
   const logEmployeeActivity = async (action: 'create' | 'update' | 'delete', employeeName: string, details?: any) => {
     const priorityMap = { create: 'medium', update: 'medium', delete: 'high' };
+    const actionMap = { create: 'added', update: 'updated', delete: 'removed' };
+    
     await logActivity({
       actionType: `employee_${action}`,
-      description: `Employee ${employeeName} was ${action === 'create' ? 'added' : action === 'update' ? 'updated' : 'removed'}`,
-      details: { employee_name: employeeName, ...details },
+      description: `Employee ${employeeName} was ${actionMap[action]}`,
+      details: { 
+        employee_name: employeeName, 
+        action_performed: actionMap[action],
+        ...details 
+      },
       priority: priorityMap[action] as 'high' | 'medium' | 'low'
     });
   };
 
   const logAttendanceActivity = async (action: 'save' | 'bulk_update', details?: any) => {
+    const descriptions = {
+      save: 'Attendance data saved successfully',
+      bulk_update: 'Bulk attendance update completed'
+    };
+
     await logActivity({
       actionType: `attendance_${action}`,
-      description: `Attendance ${action === 'save' ? 'saved' : 'bulk updated'}`,
-      details,
+      description: descriptions[action],
+      details: {
+        action_type: action,
+        timestamp: new Date().toISOString(),
+        ...details
+      },
       priority: 'low'
     });
   };
@@ -86,7 +102,27 @@ export const useActivityLogger = () => {
     await logActivity({
       actionType: 'password_change',
       description: 'User changed their password',
-      details: { security_action: true },
+      details: { 
+        security_action: true,
+        change_time: new Date().toISOString()
+      },
+      priority: 'high'
+    });
+  };
+
+  const logBackupActivity = async (type: 'create' | 'restore', details?: any) => {
+    const descriptions = {
+      create: 'System backup created successfully',
+      restore: 'System restore operation performed'
+    };
+
+    await logActivity({
+      actionType: `system_${type === 'create' ? 'backup' : 'restore'}`,
+      description: descriptions[type],
+      details: {
+        backup_type: type,
+        ...details
+      },
       priority: 'high'
     });
   };
@@ -96,6 +132,7 @@ export const useActivityLogger = () => {
     logEmployeeActivity, 
     logAttendanceActivity, 
     logSettingsActivity,
-    logPasswordChange
+    logPasswordChange,
+    logBackupActivity
   };
 };

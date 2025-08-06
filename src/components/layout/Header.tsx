@@ -8,7 +8,7 @@ export default function Header({ title }: { title: string }) {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3">
           <img 
-            src="/lovable-uploads/31e3e556-6bb0-44a2-bd2d-6d5fa04f0ba9.png" 
+            src="/AdilMunawar-uploads/31e3e556-6bb0-44a2-bd2d-6d5fa04f0ba9.png" 
             alt="AdiCorp Logo" 
             className="w-8 h-8 rounded-full"
           />

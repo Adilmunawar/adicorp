@@ -1,13 +1,14 @@
 
 import Dashboard from "@/components/layout/Dashboard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Building, Calendar, Clock, DollarSign, Lock } from "lucide-react";
+import { Settings, Building, Calendar, Clock, DollarSign, Lock, Database } from "lucide-react";
 import CompanySetupModal from "@/components/company/CompanySetupModal";
 import CurrencySettings from "@/components/settings/CurrencySettings";
 import WorkingDaysConfig from "@/components/settings/WorkingDaysConfig";
 import MonthlyWorkingDaysManager from "@/components/settings/MonthlyWorkingDaysManager";
 import WorkingTimePolicies from "@/components/settings/WorkingTimePolicies";
 import PasswordSettings from "@/components/settings/PasswordSettings";
+import BackupManager from "@/components/backup/BackupManager";
 
 export default function SettingsPage() {
   return (
@@ -19,7 +20,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="company" className="space-y-6">
-          <TabsList className="glass-card bg-adicorp-dark-light/60 grid grid-cols-6 p-1">
+          <TabsList className="glass-card bg-adicorp-dark-light/60 grid grid-cols-7 p-1">
             <TabsTrigger 
               value="company" 
               className="flex items-center gap-2 data-[state=active]:bg-adicorp-purple"
@@ -62,6 +63,13 @@ export default function SettingsPage() {
               <Lock className="h-4 w-4" />
               <span className="hidden sm:inline">Password</span>
             </TabsTrigger>
+            <TabsTrigger 
+              value="backup" 
+              className="flex items-center gap-2 data-[state=active]:bg-adicorp-purple"
+            >
+              <Database className="h-4 w-4" />
+              <span className="hidden sm:inline">Backup</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="company" className="space-y-6">
@@ -86,6 +94,10 @@ export default function SettingsPage() {
 
           <TabsContent value="password" className="space-y-6">
             <PasswordSettings />
+          </TabsContent>
+
+          <TabsContent value="backup" className="space-y-6">
+            <BackupManager />
           </TabsContent>
         </Tabs>
       </div>

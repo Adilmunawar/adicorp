@@ -1,403 +1,232 @@
-import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
-import { Loader2, AlertCircle } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { toast as sonnerToast } from "sonner";
-import { zodResolver } from "@hookform/resolvers/zod";
+
+import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
-} from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-interface EmployeeFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  employeeId?: string;
-}
-
-const ranks = [
-  "Data Entry Operator",
-  "Customer Service",
-  "Supervisor",
-  "Manager",
-  "Accountant",
-  "HR Specialist",
-  "Marketing Specialist",
-  "Developer",
-  "Designer",
-  "Executive"
-];
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
+import { toast } from "sonner";
+import { UserPlus, Save } from "lucide-react";
+import type { EmployeeRow } from "@/types/supabase";
 
 const employeeSchema = z.object({
-  name: z.string().min(1, { message: "Name is required" }),
-  rank: z.string().min(1, { message: "Rank is required" }),
-  monthly_salary: z.coerce.number().min(1, { message: "Monthly salary must be greater than 0" }),
-  status: z.enum(["active", "inactive"])
+  name: z.string().min(1, "Name is required"),
+  rank: z.string().min(1, "Rank is required"), 
+  wage_rate: z.number().min(0, "Wage rate must be positive"),
+  status: z.enum(["active", "inactive"]).default("active"),
 });
 
-type FormValues = z.infer<typeof employeeSchema>;
+type EmployeeFormData = z.infer<typeof employeeSchema>;
 
-export default function EmployeeForm({ isOpen, onClose, employeeId }: EmployeeFormProps) {
-  const isEditing = !!employeeId;
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(false);
-  const { user, session, userProfile } = useAuth();
+interface EmployeeFormProps {
+  employee?: EmployeeRow | null;
+  onSuccess?: () => void;
+  onCancel?: () => void;
+}
 
-  const form = useForm<FormValues>({
+export default function EmployeeForm({ employee, onSuccess, onCancel }: EmployeeFormProps) {
+  const [loading, setLoading] = useState(false);
+  const { userProfile } = useAuth();
+  const { logEmployeeActivity } = useActivityLogger();
+
+  const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
     defaultValues: {
-      name: "",
-      rank: "",
-      monthly_salary: 0,
-      status: "active"
-    }
+      name: employee?.name || "",
+      rank: employee?.rank || "",
+      wage_rate: employee?.wage_rate || 0,
+      status: employee?.status === "inactive" ? "inactive" : "active",
+    },
   });
 
-  const hasCompany = !!userProfile?.company_id;
-
-  useEffect(() => {
-    if (!isOpen) {
-      form.reset({
-        name: "",
-        rank: "",
-        monthly_salary: 0,
-        status: "active"
-      });
+  const handleSubmit = async (data: EmployeeFormData) => {
+    if (!userProfile?.company_id) {
+      toast.error("Company setup required");
       return;
     }
 
-    if (isOpen && isEditing && employeeId) {
-      const fetchEmployee = async () => {
-        try {
-          setIsFetching(true);
-
-          if (!session || !user) {
-            toast({
-              title: "Authentication required",
-              description: "Please log in to perform this action.",
-              variant: "destructive",
-            });
-            onClose();
-            return;
-          }
-
-          const { data, error } = await supabase
-            .from('employees')
-            .select('*')
-            .eq('id', employeeId)
-            .eq('company_id', userProfile?.company_id)
-            .single();
-
-          if (error) throw error;
-
-          if (data) {
-            form.reset({
-              name: data.name,
-              rank: data.rank,
-              monthly_salary: Number(data.wage_rate),
-              status: data.status as "active" | "inactive"
-            });
-          }
-        } catch (error) {
-          toast({
-            title: "Failed to load employee data",
-            description: "Please try again.",
-            variant: "destructive",
-          });
-          onClose();
-        } finally {
-          setIsFetching(false);
-        }
-      };
-
-      fetchEmployee();
-    }
-  }, [isOpen, isEditing, employeeId, toast, onClose, session, user, form, userProfile?.company_id]);
-
-  const handleSubmit = async (values: FormValues) => {
+    setLoading(true);
     try {
-      setIsLoading(true);
-
-      if (!session || !user) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to perform this action.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!userProfile?.company_id) {
-        toast({
-          title: "Company ID not found",
-          description: "Please set up your company first in Settings.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (isEditing && employeeId) {
+      if (employee) {
+        // Update existing employee
         const { error } = await supabase
-          .from('employees')
+          .from("employees")
           .update({
-            name: values.name,
-            rank: values.rank,
-            wage_rate: values.monthly_salary,
-            status: values.status
+            name: data.name,
+            rank: data.rank,
+            wage_rate: data.wage_rate,
+            status: data.status,
           })
-          .eq('id', employeeId)
-          .eq('company_id', userProfile.company_id);
+          .eq("id", employee.id);
 
         if (error) throw error;
 
-        sonnerToast.success("Employee updated", {
-          description: "Employee information has been updated successfully."
+        await logEmployeeActivity('update', data.name, {
+          employee_id: employee.id,
+          previous_name: employee.name,
+          previous_rank: employee.rank,
+          previous_wage_rate: employee.wage_rate,
+          new_rank: data.rank,
+          new_wage_rate: data.wage_rate,
+          status_change: employee.status !== data.status ? `${employee.status} → ${data.status}` : 'No change'
         });
+
+        toast.success(`Employee ${data.name} updated successfully`);
       } else {
-        const { error } = await supabase
-          .from('employees')
+        // Create new employee
+        const { data: newEmployee, error } = await supabase
+          .from("employees")
           .insert({
-            name: values.name,
-            rank: values.rank,
-            wage_rate: values.monthly_salary,
-            status: values.status,
-            company_id: userProfile.company_id
-          });
+            company_id: userProfile.company_id,
+            name: data.name,
+            rank: data.rank,
+            wage_rate: data.wage_rate,
+            status: data.status,
+          })
+          .select()
+          .single();
 
         if (error) throw error;
 
-        sonnerToast.success("Employee added", {
-          description: "New employee has been added successfully."
+        await logEmployeeActivity('create', data.name, {
+          employee_id: newEmployee.id,
+          rank: data.rank,
+          wage_rate: data.wage_rate,
+          status: data.status,
+          creation_time: new Date().toISOString()
         });
+
+        toast.success(`Employee ${data.name} added successfully`);
       }
 
-      onClose();
+      onSuccess?.();
     } catch (error: any) {
-      toast({
-        title: "Failed to save employee",
-        description: error.message || "Please try again.",
-        variant: "destructive",
-      });
+      console.error("Error saving employee:", error);
+      toast.error("Failed to save employee");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const renderCompanySetupNeeded = () => (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg w-full rounded-xl shadow-lg bg-adicorp-dark-light border-white/10 flex items-center justify-center">
-        <div className="flex justify-center items-center py-12">
-          <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Company Setup Required</h2>
-          <p className="text-white/70 mb-4">
-            You need to set up your company information before you can add employees.
-          </p>
-          <Button 
-            variant="default"
-            className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-            onClick={() => {
-              onClose();
-              window.location.href = '/settings';
-            }}
-          >
-            Go to Settings
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-
-  if (!hasCompany) {
-    return renderCompanySetupNeeded();
-  }
-
-  if (isFetching) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-lg w-full rounded-xl shadow-lg bg-adicorp-dark-light border-white/10 flex items-center justify-center">
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 text-adicorp-purple" />
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="
-          max-w-lg w-full rounded-xl shadow-lg
-          bg-adicorp-dark-light border-white/10
-          flex flex-col justify-center items-center
-          p-0 m-0
-        "
-        style={{
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
-          position: 'fixed',
-          maxHeight: '90vh',
-        }}
-      >
-        <DialogHeader className="w-full px-6 pb-2">
-          <DialogTitle>
-            {isEditing ? "Edit Employee" : "Add New Employee"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing
-              ? "Update employee information below"
-              : "Enter employee details to add them to your team"}
-          </DialogDescription>
-        </DialogHeader>
-        <div
-          className="w-full px-6 pt-2 pb-6"
-          style={{
-            overflowY: "auto",
-            maxHeight: "calc(90vh - 80px)",
-          }}
-        >
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        className="bg-adicorp-dark/60 border-white/10"
-                        placeholder="e.g. John Smith"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="rank"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Rank/Position</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
-                          <SelectValue placeholder="Select a position" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="bg-adicorp-dark-light border-white/10 z-[110]">
-                        {ranks.map((rank) => (
-                          <SelectItem key={rank} value={rank}>{rank}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="monthly_salary"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Monthly Salary (PKR)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        className="bg-adicorp-dark/60 border-white/10"
-                        placeholder="e.g. 45000"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="bg-adicorp-dark/60 border-white/10">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="bg-adicorp-dark-light border-white/10 z-[110]">
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+    <Card className="glass-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {employee ? <Save className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
+          {employee ? "Edit Employee" : "Add New Employee"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Enter employee name" 
+                      className="bg-adicorp-dark border-white/20 text-white"
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <DialogFooter>
+            <FormField
+              control={form.control}
+              name="rank"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rank/Position</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Enter employee rank" 
+                      className="bg-adicorp-dark border-white/20 text-white"
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="wage_rate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Wage Rate</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      placeholder="Enter wage rate" 
+                      className="bg-adicorp-dark border-white/20 text-white"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-adicorp-dark border-white/20 text-white">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+              >
+                {loading ? "Saving..." : employee ? "Update Employee" : "Add Employee"}
+              </Button>
+              {onCancel && (
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={onClose}
-                  disabled={isLoading}
-                  className="border-white/10 hover:bg-adicorp-dark"
+                  onClick={onCancel}
+                  className="flex-1 border-white/20 text-white hover:bg-white/10"
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isEditing ? "Updating..." : "Adding..."}
-                    </>
-                  ) : (
-                    isEditing ? "Update Employee" : "Add Employee"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </div>
-      </DialogContent>
-    </Dialog>
+              )}
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 }
