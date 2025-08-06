@@ -1,441 +1,249 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Edit, Trash2, User, Search, MoreHorizontal } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { 
-  Edit, 
-  Trash2, 
-  Search, 
-  Plus, 
-  UserCheck, 
-  UserX, 
-  Upload,
-  Loader2
-} from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
-import EmployeeForm from "./EmployeeForm";
-import EmployeeImportExport from "./EmployeeImportExport";
-import { formatCurrencySync } from "@/utils/salaryCalculations";
-import { useCurrency } from "@/hooks/useCurrency";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { format } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 
 interface Employee {
   id: string;
+  created_at: string;
   name: string;
+  email: string;
+  phone: string;
+  address: string;
   rank: string;
   wage_rate: number;
-  status: string;
-  user_id: string;
   company_id: string;
-  created_at: string;
+  avatar_url: string | null;
 }
 
-interface EmployeeListProps {
-  onAddEmployee?: () => void;
-  onEditEmployee?: (id: string) => void;
-}
-
-export default function EmployeeList({ onAddEmployee, onEditEmployee }: EmployeeListProps) {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
+export default function EmployeeList() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [showImportExport, setShowImportExport] = useState(false);
+  const [page, setPage] = useState(1);
   const { userProfile } = useAuth();
   const { toast } = useToast();
-  const { currency } = useCurrency();
+  const queryClient = useQueryClient();
+  const ITEMS_PER_PAGE = 10;
+  const { logEmployeeActivity } = useActivityLogger();
 
-  useEffect(() => {
-    if (userProfile?.company_id) {
-      fetchEmployees();
-    }
-  }, [userProfile?.company_id]);
+  const { data: employees, isLoading, error } = useQuery({
+    queryKey: ['employees', userProfile?.company_id, searchTerm, page],
+    queryFn: async () => {
+      if (!userProfile?.company_id) return [];
 
-  useEffect(() => {
-    const filtered = employees.filter(employee =>
-      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.rank.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredEmployees(filtered);
-  }, [employees, searchTerm]);
-
-  const fetchEmployees = async () => {
-    if (!userProfile?.company_id) return;
-
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('*')
         .eq('company_id', userProfile.company_id)
-        .order('name');
+        .order('created_at', { ascending: false });
 
+      if (searchTerm) {
+        query = query.ilike('name', `%${searchTerm}%`);
+      }
+
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+      query = query.range(from, to);
+
+      const { data, error } = await query;
       if (error) throw error;
-      setEmployees(data || []);
-    } catch (error: any) {
-      console.error('Error fetching employees:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to fetch employees",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleAddEmployee = () => {
-    if (onAddEmployee) {
-      onAddEmployee();
-    } else {
-      setEditingEmployee(null);
-      setShowForm(true);
-    }
-  };
+      return data || [];
+    },
+    enabled: !!userProfile?.company_id,
+  });
 
-  const handleEditEmployee = (employee: Employee) => {
-    if (onEditEmployee) {
-      onEditEmployee(employee.id);
-    } else {
-      setEditingEmployee(employee);
-      setShowForm(true);
+  const handleDeleteEmployee = async (employee: Employee) => {
+    if (!confirm(`Are you sure you want to delete ${employee.name}?`)) {
+      return;
     }
-  };
 
-  const handleDeleteEmployee = async (employeeId: string) => {
     try {
       const { error } = await supabase
         .from('employees')
         .delete()
-        .eq('id', employeeId);
-
-      if (error) throw error;
-
-      setEmployees(employees.filter(emp => emp.id !== employeeId));
-      toast({
-        title: "Success",
-        description: "Employee deleted successfully",
-      });
-    } catch (error: any) {
-      console.error('Error deleting employee:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete employee",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleToggleStatus = async (employee: Employee) => {
-    const newStatus = employee.status === 'active' ? 'inactive' : 'active';
-    
-    try {
-      const { error } = await supabase
-        .from('employees')
-        .update({ status: newStatus })
         .eq('id', employee.id);
 
       if (error) throw error;
 
-      setEmployees(employees.map(emp => 
-        emp.id === employee.id ? { ...emp, status: newStatus } : emp
-      ));
+      // Log the employee deletion activity
+      await logEmployeeActivity('delete', employee.name, {
+        employee_id: employee.id,
+        rank: employee.rank,
+        wage_rate: employee.wage_rate,
+        deleted_at: new Date().toISOString()
+      });
 
-      toast({
-        title: "Success",
-        description: `Employee ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`,
-      });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success("Employee deleted successfully");
     } catch (error: any) {
-      console.error('Error updating employee status:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update employee status",
-        variant: "destructive",
-      });
+      console.error("Error deleting employee:", error);
+      toast.error("Failed to delete employee");
     }
   };
 
-  const handleFormSuccess = () => {
-    setShowForm(false);
-    setEditingEmployee(null);
-    fetchEmployees();
-  };
-
-  const activeEmployees = employees.filter(emp => emp.status === 'active');
-  const totalSalaryBudget = activeEmployees.reduce((sum, emp) => sum + emp.wage_rate, 0);
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-adicorp-purple mx-auto" />
-          <p className="mt-4 text-white/60">Loading employees...</p>
-        </div>
+      <div className="space-y-4">
+        {[...Array(5)].map((_, i) => (
+          <Card key={i} className="glass-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+                <Skeleton className="h-4 w-20" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
 
-  if (!userProfile?.company_id) {
+  if (error) {
     return (
-      <div className="text-center py-8">
-        <p className="text-white/70">Please complete company setup to manage employees.</p>
-        <Button 
-          onClick={() => window.location.href = '/settings'}
-          className="mt-4 bg-adicorp-purple hover:bg-adicorp-purple-dark"
-        >
-          Go to Settings
-        </Button>
-      </div>
+      <Card className="glass-card">
+        <CardContent className="p-6 text-center">
+          <p className="text-red-400">Error loading employees</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="glass-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-white/60">
-              Total Employees
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{employees.length}</div>
-            <p className="text-xs text-white/60">
-              {activeEmployees.length} active, {employees.length - activeEmployees.length} inactive
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card className="glass-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-white/60">
-              Active Employees
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-400">
-              {activeEmployees.length}
-            </div>
-            <p className="text-xs text-white/60">Currently working</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="glass-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-white/60">
-              Monthly Salary Budget
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-400">
-              {formatCurrencySync(totalSalaryBudget)}
-            </div>
-            <p className="text-xs text-white/60">For active employees</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Employee Management */}
       <Card className="glass-card">
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <CardTitle>Employee Management</CardTitle>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => setShowImportExport(true)}
-                variant="outline"
-                size="sm"
-                className="border-white/10 hover:bg-adicorp-dark"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Import/Export
-              </Button>
-              <Button
-                onClick={handleAddEmployee}
-                className="bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Employee
-              </Button>
-            </div>
-          </div>
+          <CardTitle className="flex items-center">
+            <User className="mr-2 h-5 w-5 text-adicorp-purple" />
+            Employee List
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Search */}
-          <div className="mb-6">
+          <div className="mb-4">
+            <Label htmlFor="search">Search Employees</Label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
               <Input
-                placeholder="Search employees by name or position..."
+                id="search"
+                placeholder="Search by name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-adicorp-dark border-white/10"
+                className="pl-10 bg-adicorp-dark border-white/20 text-white"
               />
             </div>
           </div>
-
-          {/* Employee Table */}
-          {filteredEmployees.length === 0 ? (
-            <div className="text-center py-8 text-white/70">
-              {employees.length === 0 ? (
-                <div>
-                  <p className="mb-2">No employees found. Start by adding your first employee.</p>
-                  <Button
-                    onClick={handleAddEmployee}
-                    className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Employee
-                  </Button>
-                </div>
-              ) : (
-                <p>No employees match your search criteria.</p>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-white/10 hover:bg-transparent">
-                    <TableHead>Name</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead>Monthly Salary</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">Avatar</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Rank</TableHead>
+                  <TableHead>Wage Rate</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {employees?.map((employee) => (
+                  <TableRow key={employee.id}>
+                    <TableCell>
+                      <Avatar>
+                        {employee.avatar_url ? (
+                          <AvatarImage src={employee.avatar_url} alt={employee.name} />
+                        ) : (
+                          <AvatarFallback>{employee.name.charAt(0).toUpperCase()}</AvatarFallback>
+                        )}
+                      </Avatar>
+                    </TableCell>
+                    <TableCell className="font-medium">{employee.name}</TableCell>
+                    <TableCell>{employee.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{employee.rank}</Badge>
+                    </TableCell>
+                    <TableCell>${employee.wage_rate}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => alert('Edit feature coming soon!')}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            <span>Edit</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteEmployee(employee)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Delete</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>
+                            <a href={`mailto:${employee.email}`} className="flex items-center gap-2">
+                              <Mail className="mr-2 h-4 w-4" />
+                              <span>Contact Employee</span>
+                            </a>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredEmployees.map((employee) => (
-                    <TableRow 
-                      key={employee.id} 
-                      className="border-white/10 hover:bg-adicorp-dark/30"
-                    >
-                      <TableCell className="font-medium">
-                        {employee.name}
-                      </TableCell>
-                      <TableCell>{employee.rank}</TableCell>
-                      <TableCell className="font-mono">
-                        {formatCurrencySync(employee.wage_rate)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          className={
-                            employee.status === 'active' 
-                              ? "bg-green-500/20 text-green-400" 
-                              : "bg-red-500/20 text-red-400"
-                          }
-                        >
-                          {employee.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleToggleStatus(employee)}
-                            className="border-white/10 hover:bg-adicorp-dark"
-                          >
-                            {employee.status === 'active' ? (
-                              <UserX className="h-4 w-4" />
-                            ) : (
-                              <UserCheck className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditEmployee(employee)}
-                            className="border-white/10 hover:bg-adicorp-dark"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-red-500/20 text-red-400 hover:bg-red-500/10"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-adicorp-dark border-white/10">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Employee</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete {employee.name}? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel className="border-white/10 hover:bg-adicorp-dark">
-                                  Cancel
-                                </AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteEmployee(employee.id)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Employee Form Modal */}
-      {showForm && (
-        <EmployeeForm
-          isOpen={showForm}
-          onClose={() => {
-            setShowForm(false);
-            setEditingEmployee(null);
-          }}
-          employeeId={editingEmployee?.id}
-        />
-      )}
-
-      {/* Import/Export Modal */}
-      {showImportExport && (
-        <EmployeeImportExport
-          onImportComplete={() => {
-            setShowImportExport(false);
-            fetchEmployees();
-          }}
-          employees={employees}
-        />
+      {employees && employees.length === ITEMS_PER_PAGE && (
+        <div className="flex justify-center">
+          <Button
+            onClick={() => setPage(page + 1)}
+            variant="outline"
+            className="border-white/20 text-white hover:bg-white/10"
+          >
+            Load More
+          </Button>
+        </div>
       )}
     </div>
   );

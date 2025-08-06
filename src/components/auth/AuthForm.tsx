@@ -1,334 +1,236 @@
+
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link } from "react-router-dom";
+import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Mail, Lock, User, Building } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
-import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
-
-const signUpSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string(),
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
-
-const signInSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
-
-type SignUpSchemaType = z.infer<typeof signUpSchema>;
-type SignInSchemaType = z.infer<typeof signInSchema>;
 
 export default function AuthForm() {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { signUp, signIn, loading } = useAuth();
-  const { toast } = useToast();
-  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { signIn, signUp } = useAuth();
 
-  const signUpForm = useForm<SignUpSchemaType>({
-    resolver: zodResolver(signUpSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-      confirmPassword: "",
-      firstName: "",
-      lastName: "",
-    },
-  });
-
-  const signInForm = useForm<SignInSchemaType>({
-    resolver: zodResolver(signInSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  });
-
-  const handleSignIn = async (values: SignInSchemaType) => {
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading) return;
+    
+    setIsLoading(true);
     try {
-      await signIn(values.email, values.password);
-      navigate("/dashboard");
+      await signIn(email, password);
     } catch (error) {
-      console.error("Sign-in error:", error);
-      toast({
-        title: "Sign-in Failed",
-        description: "Invalid credentials. Please try again.",
-        variant: "destructive",
-      });
+      console.error("Sign in error:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleSignUp = async (values: SignUpSchemaType) => {
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading) return;
+    
+    setIsLoading(true);
     try {
-      const { confirmPassword, ...metadata } = values;
-      await signUp(values.email, values.password, {
-        firstName: values.firstName,
-        lastName: values.lastName,
+      await signUp(email, password, {
+        first_name: firstName,
+        last_name: lastName,
       });
-      toast({
-        title: "Sign-up Successful",
-        description: "Please check your email to verify your account.",
-      });
-      setIsSignUp(false);
     } catch (error) {
-      console.error("Sign-up error:", error);
-      toast({
-        title: "Sign-up Failed",
-        description: "Failed to create account. Please try again.",
-        variant: "destructive",
-      });
+      console.error("Sign up error:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-adicorp-dark via-adicorp-dark-light to-adicorp-dark p-4">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="flex items-center justify-center mb-6">
+    <div className="min-h-screen bg-gradient-to-br from-adicorp-dark via-adicorp-dark-light to-adicorp-dark flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6">
+        {/* Logo and Header */}
+        <div className="text-center space-y-4">
+          <div className="flex justify-center">
             <img 
               src="/AdilMunawar-uploads/31e3e556-6bb0-44a2-bd2d-6d5fa04f0ba9.png" 
               alt="AdiCorp Logo" 
-              className="w-20 h-20 rounded-full border-2 border-adicorp-purple/30 shadow-lg"
+              className="w-16 h-16 rounded-full ring-2 ring-adicorp-purple/30"
             />
           </div>
-          <h2 className="text-3xl font-extrabold bg-gradient-to-r from-white to-adicorp-purple bg-clip-text text-transparent">
-            Welcome to AdiCorp
-          </h2>
-          <p className="mt-2 text-sm text-white/70">
-            {isSignUp ? 'Create your account to get started' : 'Sign in to your account'}
-          </p>
-        </div>
-
-        <div className="bg-adicorp-dark-light/60 backdrop-blur-sm rounded-lg shadow-md p-6">
-          {isSignUp ? (
-            <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
-              <div>
-                <Label htmlFor="firstName" className="block text-sm font-medium text-white">
-                  First Name
-                </Label>
-                <Input
-                  type="text"
-                  id="firstName"
-                  className="mt-1 block w-full bg-adicorp-dark border-white/20 text-white"
-                  {...signUpForm.register("firstName")}
-                />
-                {signUpForm.formState.errors.firstName && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {signUpForm.formState.errors.firstName.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="lastName" className="block text-sm font-medium text-white">
-                  Last Name
-                </Label>
-                <Input
-                  type="text"
-                  id="lastName"
-                  className="mt-1 block w-full bg-adicorp-dark border-white/20 text-white"
-                  {...signUpForm.register("lastName")}
-                />
-                {signUpForm.formState.errors.lastName && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {signUpForm.formState.errors.lastName.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="email" className="block text-sm font-medium text-white">
-                  Email address
-                </Label>
-                <Input
-                  type="email"
-                  id="email"
-                  className="mt-1 block w-full bg-adicorp-dark border-white/20 text-white"
-                  {...signUpForm.register("email")}
-                />
-                {signUpForm.formState.errors.email && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {signUpForm.formState.errors.email.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="password" className="block text-sm font-medium text-white">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    id="password"
-                    className="mt-1 block w-full bg-adicorp-dark border-white/20 text-white pr-10"
-                    {...signUpForm.register("password")}
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-3 flex items-center px-2 text-gray-600 hover:text-white focus:outline-none"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-                {signUpForm.formState.errors.password && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {signUpForm.formState.errors.password.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="confirmPassword" className="block text-sm font-medium text-white">
-                  Confirm Password
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showConfirmPassword ? "text" : "password"}
-                    id="confirmPassword"
-                    className="mt-1 block w-full bg-adicorp-dark border-white/20 text-white pr-10"
-                    {...signUpForm.register("confirmPassword")}
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-3 flex items-center px-2 text-gray-600 hover:text-white focus:outline-none"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-                {signUpForm.formState.errors.confirmPassword && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {signUpForm.formState.errors.confirmPassword.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Button
-                  type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-adicorp-purple hover:bg-adicorp-purple-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-adicorp-purple"
-                  disabled={loading}
-                >
-                  {loading ? "Creating account..." : "Create Account"}
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={signInForm.handleSubmit(handleSignIn)} className="space-y-4">
-              <div>
-                <Label htmlFor="email" className="block text-sm font-medium text-white">
-                  Email address
-                </Label>
-                <Input
-                  type="email"
-                  id="email"
-                  className="mt-1 block w-full bg-adicorp-dark border-white/20 text-white"
-                  {...signInForm.register("email")}
-                />
-                {signInForm.formState.errors.email && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {signInForm.formState.errors.email.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="password" className="block text-sm font-medium text-white">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    id="password"
-                    className="mt-1 block w-full bg-adicorp-dark border-white/20 text-white pr-10"
-                    {...signInForm.register("password")}
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-3 flex items-center px-2 text-gray-600 hover:text-white focus:outline-none"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-                {signInForm.formState.errors.password && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {signInForm.formState.errors.password.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <Button
-                  type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-adicorp-purple hover:bg-adicorp-purple-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-adicorp-purple"
-                  disabled={loading}
-                >
-                  {loading ? "Signing in..." : "Sign in"}
-                </Button>
-              </div>
-            </form>
-          )}
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/20"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-adicorp-dark-light/60 text-white/70">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-3 flex justify-center gap-4">
-              <Link
-                to="#"
-                className="inline-flex items-center justify-center px-4 py-2 border border-white/20 rounded-md shadow-sm text-sm font-medium text-white bg-adicorp-dark hover:bg-adicorp-dark-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-adicorp-purple"
-              >
-                Google
-              </Link>
-              <Link
-                to="#"
-                className="inline-flex items-center justify-center px-4 py-2 border border-white/20 rounded-md shadow-sm text-sm font-medium text-white bg-adicorp-dark hover:bg-adicorp-dark-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-adicorp-purple"
-              >
-                Github
-              </Link>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-adicorp-purple bg-clip-text text-transparent">
+              AdiCorp HR
+            </h1>
+            <p className="text-white/60 mt-2">
+              Modern HR Management System
+            </p>
           </div>
         </div>
 
-        <div className="text-sm text-white/70 text-center">
-          {isSignUp ? (
-            <>
-              Already have an account?{" "}
-              <button
-                onClick={() => setIsSignUp(false)}
-                className="font-medium text-adicorp-purple hover:text-adicorp-purple-light"
-              >
-                Sign in
-              </button>
-            </>
-          ) : (
-            <>
-              Don't have an account?{" "}
-              <button
-                onClick={() => setIsSignUp(true)}
-                className="font-medium text-adicorp-purple hover:text-adicorp-purple-light"
-              >
-                Sign up
-              </button>
-            </>
-          )}
+        <Card className="glass-card border-white/10">
+          <CardHeader className="text-center space-y-1">
+            <CardTitle className="text-2xl text-white">Welcome</CardTitle>
+            <CardDescription className="text-white/70">
+              Sign in to your account or create a new one
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="signin" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-2 glass-card bg-adicorp-dark-light/60">
+                <TabsTrigger 
+                  value="signin" 
+                  className="data-[state=active]:bg-adicorp-purple text-white"
+                >
+                  Sign In
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="signup" 
+                  className="data-[state=active]:bg-adicorp-purple text-white"
+                >
+                  Sign Up
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="signin" className="space-y-4">
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email" className="text-white">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
+                      <Input
+                        id="signin-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="pl-10 bg-adicorp-dark/60 border-white/20 text-white placeholder:text-white/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password" className="text-white">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
+                      <Input
+                        id="signin-password"
+                        type="password"
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="pl-10 bg-adicorp-dark/60 border-white/20 text-white placeholder:text-white/50"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing In...
+                      </>
+                    ) : (
+                      "Sign In"
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="signup" className="space-y-4">
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName" className="text-white">First Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
+                        <Input
+                          id="firstName"
+                          type="text"
+                          placeholder="First name"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          required
+                          className="pl-10 bg-adicorp-dark/60 border-white/20 text-white placeholder:text-white/50"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName" className="text-white">Last Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
+                        <Input
+                          id="lastName"
+                          type="text"
+                          placeholder="Last name"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          required
+                          className="pl-10 bg-adicorp-dark/60 border-white/20 text-white placeholder:text-white/50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email" className="text-white">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
+                      <Input
+                        id="signup-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="pl-10 bg-adicorp-dark/60 border-white/20 text-white placeholder:text-white/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password" className="text-white">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
+                      <Input
+                        id="signup-password"
+                        type="password"
+                        placeholder="Create a password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="pl-10 bg-adicorp-dark/60 border-white/20 text-white placeholder:text-white/50"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating Account...
+                      </>
+                    ) : (
+                      "Create Account"
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        <div className="text-center">
+          <p className="text-white/50 text-sm">
+            © 2024 AdiCorp HR Management System. All rights reserved.
+          </p>
         </div>
       </div>
     </div>
