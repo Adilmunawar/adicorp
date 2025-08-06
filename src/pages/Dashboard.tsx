@@ -7,11 +7,13 @@ import { useAuth } from "@/context/AuthContext";
 import { Users, Calendar, DollarSign, TrendingUp, Building, Shield } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import SalaryStats from "@/components/salary/SalaryStats";
+import { useSalaryData } from "@/hooks/useSalaryData";
 
 export default function Dashboard() {
   const { userProfile } = useAuth();
+  const { stats, loading: salaryLoading } = useSalaryData();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: dashboardStats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats', userProfile?.company_id],
     queryFn: async () => {
       if (!userProfile?.company_id) return null;
@@ -101,21 +103,21 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             title="Total Employees"
-            value={stats?.totalEmployees || 0}
+            value={dashboardStats?.totalEmployees || 0}
             icon={<Users className="h-4 w-4 text-blue-400" />}
             description="Active employees"
             loading={statsLoading}
           />
           <StatCard
             title="Today's Attendance"
-            value={stats?.todayAttendance || 0}
+            value={dashboardStats?.todayAttendance || 0}
             icon={<Calendar className="h-4 w-4 text-green-400" />}
             description="Present today"
             loading={statsLoading}
           />
           <StatCard
             title="Upcoming Events"
-            value={stats?.upcomingEvents || 0}
+            value={dashboardStats?.upcomingEvents || 0}
             icon={<TrendingUp className="h-4 w-4 text-purple-400" />}
             description="This month"
             loading={statsLoading}
@@ -132,7 +134,7 @@ export default function Dashboard() {
         {/* Salary Statistics */}
         <div className="space-y-6">
           <h2 className="text-2xl font-bold text-white">Monthly Overview</h2>
-          <SalaryStats />
+          <SalaryStats stats={stats} loading={salaryLoading} />
         </div>
 
         {/* Recent Activity Summary */}

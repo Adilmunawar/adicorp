@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
@@ -29,9 +30,19 @@ interface EmployeeFormProps {
   employee?: EmployeeRow | null;
   onSuccess?: () => void;
   onCancel?: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  employeeId?: string;
 }
 
-export default function EmployeeForm({ employee, onSuccess, onCancel }: EmployeeFormProps) {
+export default function EmployeeForm({ 
+  employee, 
+  onSuccess, 
+  onCancel, 
+  isOpen, 
+  onClose,
+  employeeId 
+}: EmployeeFormProps) {
   const [loading, setLoading] = useState(false);
   const { userProfile } = useAuth();
   const { logEmployeeActivity } = useActivityLogger();
@@ -107,6 +118,7 @@ export default function EmployeeForm({ employee, onSuccess, onCancel }: Employee
       }
 
       onSuccess?.();
+      onClose?.();
     } catch (error: any) {
       console.error("Error saving employee:", error);
       toast.error("Failed to save employee");
@@ -114,6 +126,130 @@ export default function EmployeeForm({ employee, onSuccess, onCancel }: Employee
       setLoading(false);
     }
   };
+
+  const handleCancel = () => {
+    onCancel?.();
+    onClose?.();
+  };
+
+  const formContent = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="Enter employee name" 
+                  className="bg-adicorp-dark border-white/20 text-white"
+                  {...field} 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="rank"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Rank/Position</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="Enter employee rank" 
+                  className="bg-adicorp-dark border-white/20 text-white"
+                  {...field} 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="wage_rate"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Wage Rate</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  placeholder="Enter wage rate" 
+                  className="bg-adicorp-dark border-white/20 text-white"
+                  {...field}
+                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Status</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger className="bg-adicorp-dark border-white/20 text-white">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="flex gap-3 pt-4">
+          <Button
+            type="submit"
+            disabled={loading}
+            className="flex-1 bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+          >
+            {loading ? "Saving..." : employee ? "Update Employee" : "Add Employee"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCancel}
+            className="flex-1 border-white/20 text-white hover:bg-white/10"
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+
+  if (isOpen !== undefined) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="bg-adicorp-dark border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {employee ? <Save className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
+              {employee ? "Edit Employee" : "Add New Employee"}
+            </DialogTitle>
+          </DialogHeader>
+          {formContent}
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Card className="glass-card">
@@ -124,108 +260,7 @@ export default function EmployeeForm({ employee, onSuccess, onCancel }: Employee
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="Enter employee name" 
-                      className="bg-adicorp-dark border-white/20 text-white"
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="rank"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rank/Position</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="Enter employee rank" 
-                      className="bg-adicorp-dark border-white/20 text-white"
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="wage_rate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Wage Rate</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      placeholder="Enter wage rate" 
-                      className="bg-adicorp-dark border-white/20 text-white"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="bg-adicorp-dark border-white/20 text-white">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="submit"
-                disabled={loading}
-                className="flex-1 bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-              >
-                {loading ? "Saving..." : employee ? "Update Employee" : "Add Employee"}
-              </Button>
-              {onCancel && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onCancel}
-                  className="flex-1 border-white/20 text-white hover:bg-white/10"
-                >
-                  Cancel
-                </Button>
-              )}
-            </div>
-          </form>
-        </Form>
+        {formContent}
       </CardContent>
     </Card>
   );

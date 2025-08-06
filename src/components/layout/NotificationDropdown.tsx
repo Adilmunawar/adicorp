@@ -103,6 +103,25 @@ export default function NotificationDropdown() {
     return actionType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  const getPriorityFromDetails = (details: any): string => {
+    if (!details) return 'medium';
+    
+    if (typeof details === 'string') {
+      try {
+        const parsed = JSON.parse(details);
+        return parsed.priority || 'medium';
+      } catch {
+        return 'medium';
+      }
+    }
+    
+    if (typeof details === 'object' && details !== null) {
+      return details.priority || 'medium';
+    }
+    
+    return 'medium';
+  };
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
@@ -153,7 +172,7 @@ export default function NotificationDropdown() {
             <div className="divide-y">
               {recentLogs.map((log) => {
                 const isRead = readNotifications.has(log.id);
-                const priority = log.details?.priority || 'medium';
+                const priority = getPriorityFromDetails(log.details);
                 
                 return (
                   <div 
