@@ -6,9 +6,11 @@ import { useAuth } from "@/context/AuthContext";
 import { Users, Calendar, DollarSign, TrendingUp, Clock, UserCheck } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCurrency } from "@/hooks/useCurrency";
 
 export default function DashboardStats() {
   const { userProfile } = useAuth();
+  const { currency } = useCurrency();
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats', userProfile?.company_id],
@@ -27,13 +29,17 @@ export default function DashboardStats() {
 
       if (employeesError) throw employeesError;
 
-      // Get today's attendance
+      // Get today's attendance by joining with employees table
       const { data: todayAttendance, error: attendanceError } = await supabase
         .from('attendance')
-        .select('id, employee_id')
-        .eq('company_id', userProfile.company_id)
-        .gte('date', startOfToday.toISOString())
-        .lte('date', endOfToday.toISOString());
+        .select(`
+          id, 
+          employee_id,
+          employees!inner(company_id)
+        `)
+        .eq('employees.company_id', userProfile.company_id)
+        .gte('date', startOfToday.toISOString().split('T')[0])
+        .lte('date', endOfToday.toISOString().split('T')[0]);
 
       if (attendanceError) throw attendanceError;
 
@@ -41,9 +47,12 @@ export default function DashboardStats() {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const { data: monthlyAttendance, error: monthlyError } = await supabase
         .from('attendance')
-        .select('id')
-        .eq('company_id', userProfile.company_id)
-        .gte('date', startOfMonth.toISOString());
+        .select(`
+          id,
+          employees!inner(company_id)
+        `)
+        .eq('employees.company_id', userProfile.company_id)
+        .gte('date', startOfMonth.toISOString().split('T')[0]);
 
       if (monthlyError) throw monthlyError;
 
@@ -53,7 +62,7 @@ export default function DashboardStats() {
       const totalWageRate = employees?.reduce((sum, emp) => sum + emp.wage_rate, 0) || 0;
       const todayAttendanceCount = todayAttendance?.length || 0;
       const monthlyAttendanceCount = monthlyAttendance?.length || 0;
-      const attendanceRate = totalEmployees > 0 ? Math.round((todayAttendanceCount / activeEmployees) * 100) : 0;
+      const attendanceRate = activeEmployees > 0 ? Math.round((todayAttendanceCount / activeEmployees) * 100) : 0;
 
       return {
         totalEmployees,
@@ -66,6 +75,19 @@ export default function DashboardStats() {
     },
     enabled: !!userProfile?.company_id,
   });
+
+  const formatCurrency = (amount: number) => {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency || 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount);
+    } catch (error) {
+      return `${currency || 'USD'} ${amount.toLocaleString()}`;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -112,7 +134,7 @@ export default function DashboardStats() {
     },
     {
       title: "Total Wage Budget",
-      value: `$${stats.totalWageRate.toLocaleString()}`,
+      value: formatCurrency(stats.totalWageRate),
       description: "Combined wage rates",
       icon: DollarSign,
       color: "text-yellow-400"

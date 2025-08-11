@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { EmployeeRow } from "@/types/supabase";
 import EmployeeImportExport from "./EmployeeImportExport";
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface EmployeeListProps {
   onAddEmployee?: () => void;
@@ -52,6 +53,7 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
   const queryClient = useQueryClient();
   const ITEMS_PER_PAGE = 10;
   const { logEmployeeActivity } = useActivityLogger();
+  const { currency } = useCurrency();
 
   const { data: employees, isLoading, error, refetch } = useQuery({
     queryKey: ['employees', userProfile?.company_id, searchTerm, page],
@@ -112,6 +114,19 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
     refetch();
   };
 
+  const formatCurrency = (amount: number) => {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency || 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount);
+    } catch (error) {
+      return `${currency || 'USD'} ${amount.toLocaleString()}`;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -145,27 +160,41 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
 
   return (
     <div className="space-y-6">
-      {/* Import/Export Section */}
-      <EmployeeImportExport 
-        onImportComplete={handleImportComplete}
-        employees={employees || []}
-      />
-
+      {/* Add Employee Button - Moved to Top */}
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center">
               <User className="mr-2 h-5 w-5 text-adicorp-purple" />
-              Employee List
+              Quick Actions
             </div>
-            {onAddEmployee && (
-              <Button 
-                onClick={onAddEmployee}
-                className="bg-adicorp-purple hover:bg-adicorp-purple-dark"
-              >
-                Add Employee
-              </Button>
-            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {onAddEmployee && (
+            <Button 
+              onClick={onAddEmployee}
+              className="w-full bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+              size="lg"
+            >
+              Add New Employee
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Import/Export Section - Moved to Second Position */}
+      <EmployeeImportExport 
+        onImportComplete={handleImportComplete}
+        employees={employees || []}
+      />
+
+      {/* Employee List */}
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <User className="mr-2 h-5 w-5 text-adicorp-purple" />
+            Employee List ({employees?.length || 0} employees)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -206,7 +235,7 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
                     <TableCell>
                       <Badge variant="secondary">{employee.rank}</Badge>
                     </TableCell>
-                    <TableCell>${employee.wage_rate}</TableCell>
+                    <TableCell>{formatCurrency(employee.wage_rate)}</TableCell>
                     <TableCell>
                       <Badge variant={employee.status === 'active' ? 'default' : 'destructive'}>
                         {employee.status}

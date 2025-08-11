@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -16,6 +16,7 @@ import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { toast } from "sonner";
 import { UserPlus, Save } from "lucide-react";
 import type { EmployeeRow } from "@/types/supabase";
+import { useQuery } from "@tanstack/react-query";
 
 const employeeSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -47,15 +48,55 @@ export default function EmployeeForm({
   const { userProfile } = useAuth();
   const { logEmployeeActivity } = useActivityLogger();
 
+  // Fetch employee data if we have an employeeId but no employee data
+  const { data: fetchedEmployee } = useQuery({
+    queryKey: ['employee', employeeId],
+    queryFn: async () => {
+      if (!employeeId || !userProfile?.company_id) return null;
+      
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', employeeId)
+        .eq('company_id', userProfile.company_id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employeeId && !employee && !!userProfile?.company_id,
+  });
+
+  const currentEmployee = employee || fetchedEmployee;
+
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
     defaultValues: {
-      name: employee?.name || "",
-      rank: employee?.rank || "",
-      wage_rate: employee?.wage_rate || 0,
-      status: employee?.status === "inactive" ? "inactive" : "active",
+      name: "",
+      rank: "",
+      wage_rate: 0,
+      status: "active",
     },
   });
+
+  // Reset form when employee data changes
+  useEffect(() => {
+    if (currentEmployee) {
+      form.reset({
+        name: currentEmployee.name || "",
+        rank: currentEmployee.rank || "",
+        wage_rate: currentEmployee.wage_rate || 0,
+        status: currentEmployee.status === "inactive" ? "inactive" : "active",
+      });
+    } else {
+      form.reset({
+        name: "",
+        rank: "",
+        wage_rate: 0,
+        status: "active",
+      });
+    }
+  }, [currentEmployee, form]);
 
   const handleSubmit = async (data: EmployeeFormData) => {
     if (!userProfile?.company_id) {
@@ -65,7 +106,7 @@ export default function EmployeeForm({
 
     setLoading(true);
     try {
-      if (employee) {
+      if (currentEmployee) {
         // Update existing employee
         const { error } = await supabase
           .from("employees")
@@ -75,18 +116,18 @@ export default function EmployeeForm({
             wage_rate: data.wage_rate,
             status: data.status,
           })
-          .eq("id", employee.id);
+          .eq("id", currentEmployee.id);
 
         if (error) throw error;
 
         await logEmployeeActivity('update', data.name, {
-          employee_id: employee.id,
-          previous_name: employee.name,
-          previous_rank: employee.rank,
-          previous_wage_rate: employee.wage_rate,
+          employee_id: currentEmployee.id,
+          previous_name: currentEmployee.name,
+          previous_rank: currentEmployee.rank,
+          previous_wage_rate: currentEmployee.wage_rate,
           new_rank: data.rank,
           new_wage_rate: data.wage_rate,
-          status_change: employee.status !== data.status ? `${employee.status} → ${data.status}` : 'No change'
+          status_change: currentEmployee.status !== data.status ? `${currentEmployee.status} → ${data.status}` : 'No change'
         });
 
         toast.success(`Employee ${data.name} updated successfully`);
@@ -128,6 +169,7 @@ export default function EmployeeForm({
   };
 
   const handleCancel = () => {
+    form.reset();
     onCancel?.();
     onClose?.();
   };
@@ -198,7 +240,7 @@ export default function EmployeeForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Status</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger className="bg-adicorp-dark border-white/20 text-white">
                     <SelectValue placeholder="Select status" />
@@ -220,7 +262,7 @@ export default function EmployeeForm({
             disabled={loading}
             className="flex-1 bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
           >
-            {loading ? "Saving..." : employee ? "Update Employee" : "Add Employee"}
+            {loading ? "Saving..." : currentEmployee ? "Update Employee" : "Add Employee"}
           </Button>
           <Button
             type="button"
@@ -241,8 +283,8 @@ export default function EmployeeForm({
         <DialogContent className="bg-adicorp-dark border-white/10 text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {employee ? <Save className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
-              {employee ? "Edit Employee" : "Add New Employee"}
+              {currentEmployee ? <Save className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
+              {currentEmployee ? "Edit Employee" : "Add New Employee"}
             </DialogTitle>
           </DialogHeader>
           {formContent}
@@ -255,8 +297,8 @@ export default function EmployeeForm({
     <Card className="glass-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          {employee ? <Save className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
-          {employee ? "Edit Employee" : "Add New Employee"}
+          {currentEmployee ? <Save className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
+          {currentEmployee ? "Edit Employee" : "Add New Employee"}
         </CardTitle>
       </CardHeader>
       <CardContent>
