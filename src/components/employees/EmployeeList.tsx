@@ -160,34 +160,38 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
 
   return (
     <div className="space-y-6">
-      {/* Add Employee Button - Moved to Top */}
-      <Card className="glass-card">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center">
-              <User className="mr-2 h-5 w-5 text-adicorp-purple" />
-              Quick Actions
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {onAddEmployee && (
-            <Button 
-              onClick={onAddEmployee}
-              className="w-full bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
-              size="lg"
-            >
-              Add New Employee
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      {/* Add Employee Button - Admin Only */}
+      {userProfile?.is_admin && (
+        <>
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <User className="mr-2 h-5 w-5 text-adicorp-purple" />
+                  Admin Actions
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {onAddEmployee && (
+                <Button 
+                  onClick={onAddEmployee}
+                  className="w-full bg-adicorp-purple hover:bg-adicorp-purple-dark btn-glow"
+                  size="lg"
+                >
+                  Add New Employee
+                </Button>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Import/Export Section - Moved to Second Position */}
-      <EmployeeImportExport 
-        onImportComplete={handleImportComplete}
-        employees={employees || []}
-      />
+          {/* Import/Export Section - Admin Only */}
+          <EmployeeImportExport 
+            onImportComplete={handleImportComplete}
+            employees={employees || []}
+          />
+        </>
+      )}
 
       {/* Employee List */}
       <Card className="glass-card">
@@ -213,16 +217,16 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
           </div>
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]">Avatar</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Rank</TableHead>
-                  <TableHead>Wage Rate</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+               <TableHeader>
+                 <TableRow>
+                   <TableHead className="w-[50px]">Avatar</TableHead>
+                   <TableHead>Name</TableHead>
+                   <TableHead>Rank</TableHead>
+                   {userProfile?.is_admin && <TableHead>Wage Rate</TableHead>}
+                   <TableHead>Status</TableHead>
+                   <TableHead className="text-right">Actions</TableHead>
+                 </TableRow>
+               </TableHeader>
               <TableBody>
                 {employees?.map((employee) => (
                   <TableRow key={employee.id}>
@@ -232,11 +236,11 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
                       </Avatar>
                     </TableCell>
                     <TableCell className="font-medium">{employee.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{employee.rank}</Badge>
-                    </TableCell>
-                    <TableCell>{formatCurrency(employee.wage_rate)}</TableCell>
-                    <TableCell>
+                     <TableCell>
+                       <Badge variant="secondary">{employee.rank}</Badge>
+                     </TableCell>
+                     {userProfile?.is_admin && <TableCell>{formatCurrency(employee.wage_rate)}</TableCell>}
+                     <TableCell>
                       <Badge variant={employee.status === 'active' ? 'default' : 'destructive'}>
                         {employee.status}
                       </Badge>
@@ -251,14 +255,18 @@ export default function EmployeeList({ onAddEmployee, onEditEmployee }: Employee
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => onEditEmployee?.(employee.id)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            <span>Edit</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteEmployee(employee)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>Delete</span>
-                          </DropdownMenuItem>
+                           {userProfile?.is_admin && (
+                             <DropdownMenuItem onClick={() => onEditEmployee?.(employee.id)}>
+                               <Edit className="mr-2 h-4 w-4" />
+                               <span>Edit</span>
+                             </DropdownMenuItem>
+                           )}
+                           {userProfile?.is_admin && (
+                             <DropdownMenuItem onClick={() => handleDeleteEmployee(employee)}>
+                               <Trash2 className="mr-2 h-4 w-4" />
+                               <span>Delete</span>
+                             </DropdownMenuItem>
+                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
